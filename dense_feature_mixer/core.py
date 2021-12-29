@@ -1,11 +1,7 @@
 import pandas as pd
 import tensorflow as tf
-import numpy as np
-from tensorflow import feature_column
 from tensorflow.keras import layers
-from sklearn.metrics import log_loss
 from sklearn.base import BaseEstimator, TransformerMixin
-from tensorflow.python.feature_column.feature_column import input_layer
 
 
 class DenseFeatureMixer(BaseEstimator, TransformerMixin):
@@ -42,7 +38,7 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
         for i in embeddings_dict:
             feature_columns.append(embeddings_dict.get(i))
 
-        self.feature_layer = tf.keras.layers.DenseFeatures(feature_columns)
+        self.feature_layer = layers.DenseFeatures(feature_columns)
 
         y_dataset = pd.DataFrame(y_dataset)
 
@@ -52,9 +48,9 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
 
         self.model = tf.keras.models.Sequential()
         self.model.add(self.feature_layer)
-        self.model.add(tf.keras.layers.Dense(units=512, activation="relu"))
-        self.model.add(tf.keras.layers.Dropout(0.25))
-        self.model.add(tf.keras.layers.Dense(units=1))
+        self.model.add(layers.Dense(units=512, activation="relu"))
+        self.model.add(layers.Dropout(0.25))
+        self.model.add(layers.Dense(units=1))
         self.model.compile(loss="mse", optimizer="adam", metrics=["accuracy"])
         self.model.fit(trainset, epochs=20, verbose=2)
 
