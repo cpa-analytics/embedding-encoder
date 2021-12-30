@@ -1,110 +1,170 @@
+from __future__ import annotations
+from typing import List, Optional, Union
+
 import pandas as pd
-import tensorflow as tf
-from tensorflow.keras import layers
+import numpy as np
+from tensorflow.keras import layers, Model
 from sklearn.base import BaseEstimator, TransformerMixin
 
 
 class DenseFeatureMixer(BaseEstimator, TransformerMixin):
-    def __init__(self):
-        pass
+    def __init__(
+        self,
+        task: str,
+        categorical_vars: List[str],
+        unknown_category: int = 999,
+        numeric_vars: Optional[List[str]] = None,
+        dimensions: Optional[List[int]] = None,
+        classif_classes: Optional[int] = None,
+        classif_loss: Optional[str] = None,
+        optimizer: str = "adam",
+        epochs: int = 10,
+        batch_size: int = 32,
+        verbose: int = 0,
+    ):
+        if not task in ["regression", "classification"]:
+            raise ValueError("task must be either regression or classification")
+        self.task = task
 
-    def fit(self, x_dataset, y_dataset, num_columns, cat_columns, dim):
-        cat_columns.sort()
-        self.cat_columns = cat_columns
-        feature_columns = []
-        for i in num_columns:
-            feature_columns.append(tf.feature_column.numeric_column(i))
-
-        uniques = {col: x_dataset[col].unique() for col in cat_columns}
-
-        uniques_idx = {
-            col: x_dataset[col].drop_duplicates().index for col in cat_columns
-        }
-
-        cat_vocab_dict = {
-            i: tf.feature_column.categorical_column_with_vocabulary_list(
-                i, uniques.get(i)
+        if task == "regression" and (classif_classes or classif_loss):
+            raise ValueError(
+                "classif_classes and classif_loss must be None for regression"
             )
-            for i in cat_columns
-        }
 
-        embeddings_dict = {
-            col: tf.feature_column.embedding_column(
-                cat_vocab_dict.get(col), dimension=dim
-            )
-            for col in cat_columns
-        }
+        self.categorical_vars = categorical_vars
+        self.unknown_category = unknown_category
+        self.numeric_vars = numeric_vars or []
 
-        for i in embeddings_dict:
-            feature_columns.append(embeddings_dict.get(i))
-
-        self.feature_layer = layers.DenseFeatures(feature_columns)
-
-        y_dataset = pd.DataFrame(y_dataset)
-
-        trainset = tf.data.Dataset.from_tensor_slices(
-            (dict(x_dataset), dict(y_dataset))
-        ).batch(32)
-
-        self.model = tf.keras.models.Sequential()
-        self.model.add(self.feature_layer)
-        self.model.add(layers.Dense(units=512, activation="relu"))
-        self.model.add(layers.Dropout(0.25))
-        self.model.add(layers.Dense(units=1))
-        self.model.compile(loss="mse", optimizer="adam", metrics=["accuracy"])
-        self.model.fit(trainset, epochs=20, verbose=2)
-
-        weights = [self.model.get_weights()[i] for i in range(len(self.model.weights))]
-
-        mapped_weights = dict(zip(cat_columns, weights))
-
-        self.frames = {
-            cat_columns[k]: [
-                str(cat_columns[k]) + "_embedding_" + str(i) for i in range(2)
-            ]
-            for k in range(len(cat_columns))
-        }
-
-        frames_col_names = {
-            cat_columns[k]: [
-                str(cat_columns[k]) + "_embedding_" + str(i) for i in range(2)
-            ]
-            for k in range(len(cat_columns))
-        }
-
-        for i in weights:
-            frames_content = [
-                pd.DataFrame(
-                    mapped_weights.get(i),
-                    columns=frames_col_names.get(i),
-                    index=uniques_idx.get(i),
+        if dimensions:
+            if len(dimensions) != len(categorical_vars):
+                raise ValueError(
+                    "Dimensions must be of same length as categorical variables"
                 )
-                for i in mapped_weights
-            ]
+        self.dimensions = dimensions
 
-        mapped_frames = dict(zip(cat_columns, frames_content))
+        if (classif_classes and not classif_loss) or (
+            classif_loss and not classif_classes
+        ):
+            raise ValueError(
+                "If any of classif_classes or classif_loss is specified, both must be specified"
+            )
+        self.classif_classes = classif_classes
+        self.classif_loss = classif_loss
+        self.optimizer = optimizer
+        self.epochs = epochs
+        self.batch_size = batch_size
+        self.verbose = verbose
 
-        self.datasets = [
-            mapped_frames.get(i).join(x_dataset[i], how="left") for i in mapped_frames
-        ]
+    def fit(
+        self,
+        X: pd.DataFrame,
+        y: Union[pd.DataFrame, pd.Series],
+    ) -> DenseFeatureMixer:
+        self._validate_data(X=X, y=y)
+
+        categorical_inputs = []
+        categorical_embedded = []
+        for i, catvar in enumerate(self.categorical_vars):
+            unique = X[catvar].nunique() + 1 # add one more for unknown category
+            if self.dimensions:
+                dimension = self.dimensions[i]
+            else:
+                dimension = min(50, int(np.ceil(unique / 2)))
+            categorical_input = layers.Input(
+                shape=(), name=f"categorical_input_{catvar}"
+            )
+            categorical_inputs.append(categorical_input)
+            embedding = layers.Embedding(unique, dimension, name=f"embedding_{catvar}")(
+                categorical_input
+            )
+            categorical_embedded.append(embedding)
+
+        categorical_merged = layers.Concatenate()(categorical_embedded)
+        if self.numeric_vars:
+            numeric_input = layers.Input(
+                shape=(
+                    len(
+                        self.numeric_vars,
+                    )
+                ),
+                name="numeric_input",
+            )
+            x = layers.Concatenate()([numeric_input, categorical_merged])
+        else:
+            x = categorical_merged
+            numeric_input = []
+        x = layers.Dense(64, activation="relu")(x) # we could allow the user to provide their own nn body architecture
+        x = layers.Dropout(0.2)(x)
+        x = layers.Dense(32, activation="relu")(x)
+        if self.task == "regression":
+            output = layers.Dense(1, activation="relu")(x)
+            loss = "mse"
+            metrics = [loss]
+        else:
+            metrics = ["accuracy"]
+            if self.classif_classes:
+                output_units = self.classif_classes
+                loss = self.classif_loss
+            else:
+                nunique_y = len(np.unique(y))
+                if y.ndim == 1 and nunique_y == 2:
+                    output_units = 1
+                elif y.dim == 1 and nunique_y > 2:
+                    output_units = nunique_y
+                else:
+                    output_units = y.shape[1]
+            if output_units == 1:
+                output_activation = "sigmoid"
+                loss = "binary_crossentropy"
+            else:
+                output_activation = "softmax"
+                if y.dim == 1:
+                    loss = "sparse_categorical_crossentropy"
+                else:
+                    loss = "categorical_crossentropy"
+            output = layers.Dense(output_units, activation=output_activation)(x)
+        self.model = Model(inputs=[numeric_input] + categorical_inputs, outputs=output)
+
+        self.model.compile(optimizer=self.optimizer, loss=loss, metrics=metrics)
+        numeric_x = [X[self.numeric_vars]] if self.numeric_vars else []
+        merged_x = numeric_x + [X[i] for i in self.categorical_vars]
+        self.model.fit(
+            x=merged_x,
+            y=y,
+            epochs=self.epochs,
+            batch_size=self.batch_size,
+            verbose=self.verbose,
+        )
+
+        self.weights = {
+            k: self.model.get_layer(f"embedding_{k}").weights
+            for k in self.categorical_vars
+        }
+        self.embeddings_mapping = {
+            k: pd.DataFrame(
+                self.weights[k][0].numpy(),
+                index=np.sort(np.append(X[k].unique(), self.unknown_category)),
+                columns=[
+                    f"embedding_{k}_{i}" for i in range(self.weights[k][0].shape[1])
+                ],
+            )
+            for k in self.categorical_vars
+        }
 
         return self
 
-    def transform(self, x_dataset):
-
-        final_datasets = [
-            x_dataset.merge(
-                self.datasets[i], how="inner", on=self.cat_columns[i], copy=False
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        final_embeddings = []
+        for k in self.categorical_vars:
+            final_embedding = X.join(self.embeddings_mapping[k], on=k, how="left").drop(
+                self.categorical_vars, axis=1
             )
-            for i in range(len(self.datasets))
-        ]
+            final_embeddings.append(final_embedding)
+        final_embeddings = pd.concat(final_embeddings, axis=1)
 
-        for i in range(len(final_datasets)):
-            final_datasets[i].drop(x_dataset.columns, axis=1, inplace=True)
+        final_x = pd.concat(
+            [X.drop(self.categorical_vars, axis=1), final_embeddings], axis=1
+        )
+        final_x = final_x.loc[:, ~final_x.columns.duplicated()]
 
-        for i in range(len(final_datasets)):
-            x_dataset = x_dataset.merge(
-                final_datasets[i], left_index=True, right_index=True, how="inner"
-            )
-
-        return x_dataset
+        return final_x
