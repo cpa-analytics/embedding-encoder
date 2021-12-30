@@ -36,7 +36,8 @@ X_test[categorical_vars] = encoder.transform(X_test[categorical_vars])
 num_transformer = make_column_transformer((StandardScaler(), numeric_vars), remainder="passthrough")
 
 pipe = make_pipeline(DenseFeatureMixer(task="classification",
-                                       categorical_vars=categorical_vars),
+                                       categorical_vars=categorical_vars,
+                                       unknown_category=999),
                      num_transformer,
                      LogisticRegression())
 pipe.fit(X_train, y_train)
