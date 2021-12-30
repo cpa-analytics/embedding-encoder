@@ -12,6 +12,7 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
         self,
         task: str,
         categorical_vars: List[str],
+        unknown_category: int = 999,
         numeric_vars: Optional[List[str]] = None,
         dimensions: Optional[List[int]] = None,
         classif_classes: Optional[int] = None,
@@ -31,6 +32,7 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
             )
 
         self.categorical_vars = categorical_vars
+        self.unknown_category = unknown_category
         self.numeric_vars = numeric_vars or []
 
         if dimensions:
@@ -63,7 +65,7 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
         categorical_inputs = []
         categorical_embedded = []
         for i, catvar in enumerate(self.categorical_vars):
-            unique = X[catvar].nunique()
+            unique = X[catvar].nunique() + 1 # add one more for unknown category
             if self.dimensions:
                 dimension = self.dimensions[i]
             else:
@@ -138,10 +140,10 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
             k: self.model.get_layer(f"embedding_{k}").weights
             for k in self.categorical_vars
         }
-        self.embeddings_mapping = { # I'm not sure the order of the weights matches the order of unique values in the categorical variables
+        self.embeddings_mapping = {
             k: pd.DataFrame(
                 self.weights[k][0].numpy(),
-                index=X[k].unique(),
+                index=np.sort(np.append(X[k].unique(), self.unknown_category)),
                 columns=[
                     f"embedding_{k}_{i}" for i in range(self.weights[k][0].shape[1])
                 ],
@@ -163,6 +165,6 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
         final_x = pd.concat(
             [X.drop(self.categorical_vars, axis=1), final_embeddings], axis=1
         )
-        final_x = final_x.loc[:, ~final_x.columns.duplicated()].fillna(0)
+        final_x = final_x.loc[:, ~final_x.columns.duplicated()]
 
         return final_x
