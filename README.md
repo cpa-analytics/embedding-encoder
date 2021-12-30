@@ -29,9 +29,9 @@ from sklearn.preprocessing import StandardScaler, OrdinalEncoder
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
 
-encoder = OrdinalEncoder()
+encoder = OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=999)
 X_train[categorical_vars] = encoder.fit_transform(X_train[categorical_vars])
-X_test[categorical_vars] = encoder.fit_transform(X_test[categorical_vars])
+X_test[categorical_vars] = encoder.transform(X_test[categorical_vars])
 
 num_transformer = make_column_transformer((StandardScaler(), numeric_vars), remainder="passthrough")
 

@@ -163,6 +163,6 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
         final_x = pd.concat(
             [X.drop(self.categorical_vars, axis=1), final_embeddings], axis=1
         )
-        final_x = final_x.loc[:, ~final_x.columns.duplicated()]
+        final_x = final_x.loc[:, ~final_x.columns.duplicated()].fillna(0)
 
         return final_x
