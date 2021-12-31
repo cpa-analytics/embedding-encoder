@@ -33,7 +33,7 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
 
         self.categorical_vars = categorical_vars
         self.unknown_category = unknown_category
-        self.numeric_vars = numeric_vars or []
+        self.numeric_vars = numeric_vars
 
         if dimensions:
             if len(dimensions) != len(categorical_vars):
@@ -61,6 +61,8 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
         y: Union[pd.DataFrame, pd.Series],
     ) -> DenseFeatureMixer:
         self._validate_data(X=X, y=y)
+        self._numeric_vars = self.numeric_vars if self.numeric_vars else []
+
 
         categorical_inputs = []
         categorical_embedded = []
@@ -83,11 +85,11 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
             all_categorical = layers.Concatenate()(categorical_embedded)
         else:
             all_categorical = categorical_embedded[0]
-        if self.numeric_vars:
+        if self._numeric_vars:
             numeric_input = layers.Input(
                 shape=(
                     len(
-                        self.numeric_vars,
+                        self._numeric_vars,
                     )
                 ),
                 name="numeric_input",
@@ -127,16 +129,16 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
                     loss = "categorical_crossentropy"
             output = layers.Dense(output_units, activation=output_activation)(x)
         if len(self.categorical_vars) > 1:
-            self.model = Model(inputs=[numeric_input] + categorical_inputs, outputs=output)
-        elif self.numeric_vars:
-            self.model = Model(inputs=[numeric_input] + categorical_inputs, outputs=output)
+            self._model = Model(inputs=[numeric_input] + categorical_inputs, outputs=output)
+        elif self._numeric_vars:
+            self._model = Model(inputs=[numeric_input] + categorical_inputs, outputs=output)
         else:
-            self.model = Model(inputs=categorical_inputs[0], outputs=output)
+            self._model = Model(inputs=categorical_inputs[0], outputs=output)
 
-        self.model.compile(optimizer=self.optimizer, loss=loss, metrics=metrics)
-        numeric_x = [X[self.numeric_vars]] if self.numeric_vars else []
+        self._model.compile(optimizer=self.optimizer, loss=loss, metrics=metrics)
+        numeric_x = [X[self._numeric_vars]] if self._numeric_vars else []
         merged_x = numeric_x + [X[i] for i in self.categorical_vars]
-        self.model.fit(
+        self._model.fit(
             x=merged_x,
             y=y,
             epochs=self.epochs,
@@ -144,16 +146,16 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
             verbose=self.verbose,
         )
 
-        self.weights = {
-            k: self.model.get_layer(f"embedding_{k}").weights
+        self._weights = {
+            k: self._model.get_layer(f"embedding_{k}").weights
             for k in self.categorical_vars
         }
-        self.embeddings_mapping = {
+        self._embeddings_mapping = {
             k: pd.DataFrame(
-                self.weights[k][0].numpy(),
+                self._weights[k][0].numpy(),
                 index=np.sort(np.append(X[k].unique(), self.unknown_category)),
                 columns=[
-                    f"embedding_{k}_{i}" for i in range(self.weights[k][0].shape[1])
+                    f"embedding_{k}_{i}" for i in range(self._weights[k][0].shape[1])
                 ],
             )
             for k in self.categorical_vars
@@ -164,7 +166,7 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
         final_embeddings = []
         for k in self.categorical_vars:
-            final_embedding = X.join(self.embeddings_mapping[k], on=k, how="left").drop(
+            final_embedding = X.join(self._embeddings_mapping[k], on=k, how="left").drop(
                 self.categorical_vars, axis=1
             )
             final_embeddings.append(final_embedding)
