@@ -80,9 +80,9 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
             categorical_embedded.append(embedding)
 
         if len(self.categorical_vars) > 1:
-            categorical_merged = layers.Concatenate()(categorical_embedded)
+            all_categorical = layers.Concatenate()(categorical_embedded)
         else:
-            categorical_merged = categorical_embedded[0]
+            all_categorical = categorical_embedded[0]
         if self.numeric_vars:
             numeric_input = layers.Input(
                 shape=(
@@ -92,9 +92,9 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
                 ),
                 name="numeric_input",
             )
-            x = layers.Concatenate()([numeric_input, categorical_merged])
+            x = layers.Concatenate()([numeric_input, all_categorical])
         else:
-            x = categorical_merged
+            x = all_categorical
             numeric_input = []
         x = layers.Dense(64, activation="relu")(x) # we could allow the user to provide their own nn body architecture
         x = layers.Dropout(0.2)(x)
