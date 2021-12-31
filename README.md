@@ -18,7 +18,7 @@ dfm.fit(X=X_train, y=y_train)
 output = dfm.transform(X=X_train)
 ```
 
-DFM expects categorical variables to be integer arrays, which can be done easily with scikit's `OrdinalEncoder`. However, at the moment `DenseFeatureMixer` can only be the first step in a `Pipeline` because it requires its `X` input to be a `DataFrame` with proper column names, which cannot be guaranteed if previous transformations are applied. This means that ordinal encoding has to be performed outside of the pipeline.
+DFM expects categorical variables to be integer arrays, which can be done easily with scikit's `OrdinalEncoder`. This can be included in a sklearn `Pipeline` provided transformations preceding DFM are held inside the provided `ColumnTransformerWithNames`. Without it, DFM can be included only as the first step in a `Pipeline` because it requires its `X` input to be a `DataFrame` with proper column names, which cannot be guaranteed if previous transformations are applied.
 
 ```python
 from sklearn.model_selection import train_test_split
@@ -26,20 +26,20 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import make_pipeline
 from sklearn.compose import make_column_transformer
 from sklearn.preprocessing import StandardScaler, OrdinalEncoder
+from dense_feature_mixer import DenseFeatureMixer
+from dense_feature_mixer.compose import ColumnTransformerWithNames
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
 
-encoder = OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=999)
-X_train[categorical_vars] = encoder.fit_transform(X_train[categorical_vars])
-X_test[categorical_vars] = encoder.transform(X_test[categorical_vars])
+ordinal_encoder = OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=999)
+col_transformer = ColumnTransformerWithNames([("num_transformer", StandardScaler(), numeric_vars),
+                                              ("cat_transformer", ordinal_encoder, categorical_vars)],
+                                             remainder="drop")
 
-num_transformer = make_column_transformer((StandardScaler(), numeric_vars), remainder="passthrough")
-
-pipe = make_pipeline(DenseFeatureMixer(task="classification",
+pipe = make_pipeline(col_transformer,
+                     DenseFeatureMixer(task="classification",
                                        categorical_vars=categorical_vars,
                                        unknown_category=999),
-                     num_transformer,
                      LogisticRegression())
 pipe.fit(X_train, y_train)
-pipe.score(X_test, y_test)
 ```
