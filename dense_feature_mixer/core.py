@@ -79,7 +79,10 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
             )
             categorical_embedded.append(embedding)
 
-        categorical_merged = layers.Concatenate()(categorical_embedded)
+        if len(self.categorical_vars) > 1:
+            categorical_merged = layers.Concatenate()(categorical_embedded)
+        else:
+            categorical_merged = categorical_embedded[0]
         if self.numeric_vars:
             numeric_input = layers.Input(
                 shape=(
@@ -123,7 +126,12 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
                 else:
                     loss = "categorical_crossentropy"
             output = layers.Dense(output_units, activation=output_activation)(x)
-        self.model = Model(inputs=[numeric_input] + categorical_inputs, outputs=output)
+        if len(self.categorical_vars) > 1:
+            self.model = Model(inputs=[numeric_input] + categorical_inputs, outputs=output)
+        elif self.numeric_vars:
+            self.model = Model(inputs=[numeric_input] + categorical_inputs, outputs=output)
+        else:
+            self.model = Model(inputs=categorical_inputs[0], outputs=output)
 
         self.model.compile(optimizer=self.optimizer, loss=loss, metrics=metrics)
         numeric_x = [X[self.numeric_vars]] if self.numeric_vars else []
