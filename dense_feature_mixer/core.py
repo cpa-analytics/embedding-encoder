@@ -22,6 +22,57 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
         batch_size: int = 32,
         verbose: int = 0,
     ):
+        """Obtain numeric embeddings from categorical variables previously encoded as integers.
+
+        Dense Feature Mixer trains a small neural network with categorical inputs passed through
+        embedding layers. Numeric variables can be included as additional inputs.
+
+        DFM returns (unique_values + 1) / 2 vectors per categorical variable, with a minimum of 2
+        and a maximum of 50. However, this can be changed by passing a list of integers to `dimensions`.
+
+        Parameters
+        ----------
+        task :
+            "regression" or "classification". This determines the units in the head layer, loss and
+            metrics used.
+        categorical_vars :
+            Array-like of strings containing the names of the categorical variables which will be
+            processed.
+        unknown_category :
+            Out of vocabulary values will be mapped to this category. This should match the unknown
+            value used in OrdinalEncoder.
+        numeric_vars :
+            Array-like of strings containing the names of the numeric variables that will be included
+            as inputs to the network.
+        dimensions :
+            Array-like of integers containing the number of embedding dimensions for each categorical
+            feature. If none, the dimension will be `min(50, int(np.ceil((unique + 1) / 2)))`
+        classif_classes :
+            Number of classes in `y` for classification tasks.
+        classif_loss : Optional[str], optional
+            Loss function for classification tasks.
+        optimizer :
+            Optimizer, default "adam".
+        epochs :
+            Number of epochs, default 10.
+        batch_size : int, optional
+            Batches size, default 32.
+        verbose : int, optional
+            Verbosity of the Keras `fit` method, default 0.
+
+        Raises
+        ------
+        ValueError
+            If `task` is not "regression" or "classification".
+        ValueError
+            If `classif_classes` or `classif_loss` are specified for regression tasks.
+        ValueError
+            If `numeric_vars` is specified and `categorical_vars` is not.
+        ValueError
+            If `dimensions` is specified and is not of the same length as `categorical_vars`.
+        ValueError
+            If `classif_classes` is specified but `classif_loss` is not.
+        """
         if not task in ["regression", "classification"]:
             raise ValueError("task must be either regression or classification")
         self.task = task
