@@ -223,7 +223,7 @@ webencodings==0.5.1
     # via bleach
 widgetsnbextension==3.5.2
     # via ipywidgets
-zipp==3.6.0
+zipp==3.7.0
     # via
     #   -c requirements.txt
     #   importlib-metadata
