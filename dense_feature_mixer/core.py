@@ -21,7 +21,7 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
         classif_classes: Optional[int] = None,
         classif_loss: Optional[str] = None,
         optimizer: str = "adam",
-        epochs: int = 3,
+        epochs: int = 5,
         batch_size: int = 32,
         verbose: int = 0,
     ):
