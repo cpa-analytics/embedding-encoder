@@ -3,7 +3,7 @@ from typing import List, Optional, Union
 
 import pandas as pd
 import numpy as np
-from tensorflow.keras import layers, Model
+from tensorflow.keras import layers, Model, callbacks
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.preprocessing import OrdinalEncoder
 
@@ -23,6 +23,7 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
         optimizer: str = "adam",
         epochs: int = 5,
         batch_size: int = 32,
+        validation_split: float = 0.2,
         verbose: int = 0,
     ):
         """Obtain numeric embeddings from categorical variables previously encoded as integers.
@@ -62,10 +63,12 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
             Optimizer, default "adam".
         epochs :
             Number of epochs, default 3.
-        batch_size : int, optional
+        batch_size :
             Batches size, default 32.
-        verbose : int, optional
-            Verbosity of the Keras `fit` method, default 0.
+        validation_split :
+            Passed to Keras `Model.fit`.
+        verbose :
+            Verbosity of the Keras `Model.fit`, default 0.
 
         Raises
         ------
@@ -102,6 +105,7 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
         self.optimizer = optimizer
         self.epochs = epochs
         self.batch_size = batch_size
+        self.validation_split = validation_split
         self.verbose = verbose
 
     def fit(
@@ -225,12 +229,19 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
         merged_x = numeric_x + [
             X_copy[i].astype(np.float32) for i in self._categorical_vars
         ]
-        self._model.fit(
+        if self.validation_split > 0.0:
+            monitor = "val_loss"
+        else:
+            monitor = "loss"
+        self._history = self._model.fit(
             x=merged_x,
             y=y,
             epochs=self.epochs,
             batch_size=self.batch_size,
             verbose=self.verbose,
+            validation_split=self.validation_split,
+            callbacks=[callbacks.EarlyStopping(monitor=monitor, patience=2,
+                                               restore_best_weights=True)]
         )
 
         self._weights = {
