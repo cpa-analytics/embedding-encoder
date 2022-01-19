@@ -26,13 +26,33 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
         validation_split: float = 0.2,
         verbose: int = 0,
     ):
-        """Obtain numeric embeddings from categorical variables previously encoded as integers.
+        """Obtain numeric embeddings from categorical variables.
 
         Dense Feature Mixer trains a small neural network with categorical inputs passed through
-        embedding layers. Numeric variables can be included as additional inputs.
+        embedding layers. Numeric variables can be included as additional inputs by setting
+        `numeric_vars`.
+
+        By default, non numeric variables are encoded with Scikit-Learn's `OrdinalEncoder`. This
+        can be changed by setting `encode=False` if no encoding is necessary.
 
         DFM returns (unique_values + 1) / 2 vectors per categorical variable, with a minimum of 2
         and a maximum of 50. However, this can be changed by passing a list of integers to `dimensions`.
+
+        The neural network architecture and training loop can be partially modified. `layers_units`
+        takes an array of integers, each representing an additional dense layer, i.e, `[32, 24, 16]`
+        will create 3 hidden layers with the corresponding units, with dropout layers interleaved,
+        while `dropout` controls the dropout rate.
+
+        While DFM will try to infer the appropiate number of units for the output layer and the
+        model's loss for classification tasks, these can be set with `classif_classes` and
+        `classif_loss`. Regression tasks will always have 1 unit in the output layer and mean
+        squared error loss.
+
+        `optimizer` and `batch_size` are passed directly to Keras.
+
+        `validation_split` is also passed to Keras. Setting it to something higher than 0 will use
+        validation loss in order to decide whether to stop training early. Otherwise train loss
+        will be used.
 
         Parameters
         ----------
@@ -113,6 +133,23 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
         X: pd.DataFrame,
         y: Union[pd.DataFrame, pd.Series],
     ) -> DenseFeatureMixer:
+        """
+        Fit the DenseFeatureMixer to X.
+
+        Parameters
+        ----------
+        X :
+            The data to process. It can include numeric variables that will not be encoded but will
+            be used in the neural network as additional inputs.
+
+        y :
+            Target data. Used as target in the neural network.
+
+        Returns
+        -------
+        self : object
+            Fitted DFM.
+        """
         self._numeric_vars = self.numeric_vars or []
         self._layers_units = self.layers_units or [24, 12]
 
@@ -262,6 +299,19 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
         return self
 
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """
+        Transform X using computed variable embeddings.
+
+        Parameters
+        ----------
+        X :
+            The data to process.
+
+        Returns
+        -------
+        embeddings :
+            Vector embeddings for each categorical variable.
+        """
         if not X.shape[1] == len(self._categorical_vars) + len(self._numeric_vars):
             raise ValueError("X must have the same dimensions as used in training.")
 
