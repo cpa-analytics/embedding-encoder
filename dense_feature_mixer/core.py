@@ -109,15 +109,18 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
         X: pd.DataFrame,
         y: Union[pd.DataFrame, pd.Series],
     ) -> DenseFeatureMixer:
-        if self.numeric_vars and not isinstance(X, pd.DataFrame):
-            raise ValueError("Cannot specify numeric_vars if X is not a DataFrame.")
         self._numeric_vars = self.numeric_vars or []
+        self._layers_units = self.layers_units or [24, 12]
+
+        if self._numeric_vars and not isinstance(X, pd.DataFrame):
+            raise ValueError("Cannot specify numeric_vars if X is not a DataFrame.")
+
         if self.dimensions:
             if len(self.dimensions) != (X.shape[1] - len(self._numeric_vars)):
                 raise ValueError(
                     "Dimensions must be of same length as non-numeric variables"
                 )
-        self._layers_units = self.layers_units or [24, 12]
+
         X_copy = X.copy()
         if self.encode:
             self._validate_data(y=y)
@@ -125,15 +128,23 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
             self._validate_data(X=X_copy, y=y)
 
         if isinstance(X_copy, pd.DataFrame):
-            self._categorical_vars = [x for x in X_copy.columns if x not in self._numeric_vars]
+            self._categorical_vars = [
+                x for x in X_copy.columns if x not in self._numeric_vars
+            ]
         else:
             # Assume it's a numpy array and that all columns are categorical
-            X_copy = pd.DataFrame(X_copy, columns=[f"cat{i}" for i in range(X_copy.shape[1])])
+            X_copy = pd.DataFrame(
+                X_copy, columns=[f"cat{i}" for i in range(X_copy.shape[1])]
+            )
             self._categorical_vars = list(X_copy.columns)
+
         if self.encode:
-            self._ordinal_encoder = OrdinalEncoder(handle_unknown="use_encoded_value",
-                                                   unknown_value=self.unknown_category)
-            X_copy[self._categorical_vars] = self._ordinal_encoder.fit_transform(X_copy[self._categorical_vars])
+            self._ordinal_encoder = OrdinalEncoder(
+                handle_unknown="use_encoded_value", unknown_value=self.unknown_category
+            )
+            X_copy[self._categorical_vars] = self._ordinal_encoder.fit_transform(
+                X_copy[self._categorical_vars]
+            )
 
         categorical_inputs = []
         categorical_embedded = []
@@ -159,20 +170,17 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
             all_categorical = categorical_embedded[0]
         if self._numeric_vars:
             numeric_input = layers.Input(
-                shape=(
-                    len(
-                        self._numeric_vars,
-                    )
-                ),
-                name="numeric_input",
+                shape=(len(self._numeric_vars)), name="numeric_input"
             )
             x = layers.Concatenate()([numeric_input, all_categorical])
         else:
             x = all_categorical
             numeric_input = []
+
         for units in self._layers_units:
             x = layers.Dense(units, activation="relu")(x)
             x = layers.Dropout(self.dropout)(x)
+
         if self.task == "regression":
             output = layers.Dense(1, activation="relu")(x)
             loss = "mse"
@@ -200,14 +208,23 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
                 else:
                     loss = "categorical_crossentropy"
             output = layers.Dense(output_units, activation=output_activation)(x)
+
         if len(self._categorical_vars) > 1 or self._numeric_vars:
-            self._model = Model(inputs=[numeric_input] + categorical_inputs, outputs=output)
+            self._model = Model(
+                inputs=[numeric_input] + categorical_inputs, outputs=output
+            )
         else:
             self._model = Model(inputs=categorical_inputs[0], outputs=output)
         self._model.compile(optimizer=self.optimizer, loss=loss, metrics=metrics)
 
-        numeric_x = [np.array(X_copy[self._numeric_vars]).astype(np.float32)] if self._numeric_vars else []
-        merged_x = numeric_x + [X_copy[i].astype(np.float32) for i in self._categorical_vars]
+        numeric_x = (
+            [np.array(X_copy[self._numeric_vars]).astype(np.float32)]
+            if self._numeric_vars
+            else []
+        )
+        merged_x = numeric_x + [
+            X_copy[i].astype(np.float32) for i in self._categorical_vars
+        ]
         self._model.fit(
             x=merged_x,
             y=y,
@@ -236,21 +253,26 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
         if not X.shape[1] == len(self._categorical_vars) + len(self._numeric_vars):
             raise ValueError("X must have the same dimensions as used in training.")
+
         X_copy = X.copy()
         if not isinstance(X_copy, pd.DataFrame):
-            X_copy = pd.DataFrame(X_copy, columns=[f"cat{i}" for i in range(X_copy.shape[1])])
+            X_copy = pd.DataFrame(
+                X_copy, columns=[f"cat{i}" for i in range(X_copy.shape[1])]
+            )
         if not all(i in X_copy.columns for i in self._categorical_vars):
             raise ValueError("X must contain all categorical variables.")
 
         if self.encode:
-            X_copy[self._categorical_vars] = self._ordinal_encoder.transform(X_copy[self._categorical_vars])
+            X_copy[self._categorical_vars] = self._ordinal_encoder.transform(
+                X_copy[self._categorical_vars]
+            )
         final_embeddings = []
         for k in self._categorical_vars:
             final_embedding = X_copy.join(self._embeddings_mapping[k], on=k, how="left")
             final_embeddings.append(final_embedding)
         final_embeddings = pd.concat(final_embeddings, axis=1).drop(
-                self._categorical_vars + self._numeric_vars, axis=1
-            )
+            self._categorical_vars + self._numeric_vars, axis=1
+        )
 
         self.columns_out = final_embeddings.columns
 
