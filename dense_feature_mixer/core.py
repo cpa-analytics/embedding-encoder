@@ -12,7 +12,6 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
     def __init__(
         self,
         task: str,
-        categorical_vars: Optional[List[str]] = None,
         encode: bool = True,
         unknown_category: int = 999,
         numeric_vars: Optional[List[str]] = None,
@@ -37,9 +36,6 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
         task :
             "regression" or "classification". This determines the units in the head layer, loss and
             metrics used.
-        categorical_vars :
-            Array-like of strings containing the names of the categorical variables which will be
-            processed.
         encode :
             Whether to apply `OrdinalEncoder` to categorical variables, by default True.
         unknown_category :
@@ -71,10 +67,6 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
         ValueError
             If `classif_classes` or `classif_loss` are specified for regression tasks.
         ValueError
-            If `numeric_vars` is specified and `categorical_vars` is not.
-        ValueError
-            If `dimensions` is specified and is not of the same length as `categorical_vars`.
-        ValueError
             If `classif_classes` is specified but `classif_loss` is not.
         """
         if not task in ["regression", "classification"]:
@@ -85,18 +77,9 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
             raise ValueError(
                 "classif_classes and classif_loss must be None for regression"
             )
-        if not categorical_vars and numeric_vars:
-            raise ValueError("categorical_vars must be specified if numeric_vars is specified")
-        self.categorical_vars = categorical_vars
         self.encode = encode
         self.unknown_category = unknown_category
         self.numeric_vars = numeric_vars
-
-        if dimensions:
-            if len(dimensions) != len(categorical_vars):
-                raise ValueError(
-                    "Dimensions must be of same length as categorical variables"
-                )
         self.dimensions = dimensions
 
         if (classif_classes and not classif_loss) or (
@@ -117,20 +100,25 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
         X: pd.DataFrame,
         y: Union[pd.DataFrame, pd.Series],
     ) -> DenseFeatureMixer:
+        if self.numeric_vars and not isinstance(X, pd.DataFrame):
+            raise ValueError("Cannot specify numeric_vars if X is not a DataFrame.")
+        self._numeric_vars = self.numeric_vars if self.numeric_vars else []
+        if self.dimensions:
+            if len(self.dimensions) != (X.shape[1] - len(self._numeric_vars)):
+                raise ValueError(
+                    "Dimensions must be of same length as non-numeric variables"
+                )
         X_copy = X.copy()
         if self.encode:
             self._validate_data(y=y)
         else:
             self._validate_data(X=X_copy, y=y)
-        if self.categorical_vars:
-            self._categorical_vars = self.categorical_vars
-        elif isinstance(X_copy, pd.DataFrame):
-            self._categorical_vars = X_copy.columns
+        if isinstance(X_copy, pd.DataFrame):
+            self._categorical_vars = [x for x in X_copy.columns if x not in self._numeric_vars]
         else:
-            # Assume it's a numpy array
+            # Assume it's a numpy array and that all columns are categorical
             X_copy = pd.DataFrame(X_copy, columns=[f"cat{i}" for i in range(X_copy.shape[1])])
-            self._categorical_vars = X_copy.columns
-        self._numeric_vars = self.numeric_vars if self.numeric_vars else []
+            self._categorical_vars = list(X_copy.columns)
         if self.encode:
             self._ordinal_encoder = OrdinalEncoder(handle_unknown="use_encoded_value",
                                                    unknown_value=self.unknown_category)
@@ -139,7 +127,8 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
         categorical_inputs = []
         categorical_embedded = []
         for i, catvar in enumerate(self._categorical_vars):
-            unique = X_copy[catvar].nunique() + 1 # add one more for unknown category
+            # Add one more dimension for unseen values (oov)
+            unique = X_copy[catvar].nunique() + 1
             if self.dimensions:
                 dimension = self.dimensions[i]
             else:
@@ -170,7 +159,7 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
         else:
             x = all_categorical
             numeric_input = []
-        x = layers.Dense(32, activation="relu")(x) # we could allow the user to provide their own nn body architecture
+        x = layers.Dense(32, activation="relu")(x)
         x = layers.Dropout(0.2)(x)
         x = layers.Dense(16, activation="relu")(x)
         if self.task == "regression":
@@ -237,27 +226,25 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
 
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
         X_copy = X.copy()
+        if not X.shape[1] == len(self._categorical_vars) + len(self._numeric_vars):
+            raise ValueError("X must have the same dimensions as used in training.")
         if not isinstance(X_copy, pd.DataFrame):
             X_copy = pd.DataFrame(X_copy, columns=[f"cat{i}" for i in range(X_copy.shape[1])])
         if not all(i in X_copy.columns for i in self._categorical_vars):
-            raise ValueError("X must contain all categorical variables specified in the constructor. If none were specified, X must have the same number of columns as X used in fit.")
+            raise ValueError("X must contain all categorical variables.")
         if self.encode:
             X_copy[self._categorical_vars] = self._ordinal_encoder.transform(X_copy[self._categorical_vars])
         final_embeddings = []
         for k in self._categorical_vars:
-            final_embedding = X_copy.join(self._embeddings_mapping[k], on=k, how="left").drop(
-                self._categorical_vars, axis=1
-            )
+            final_embedding = X_copy.join(self._embeddings_mapping[k], on=k, how="left")
             final_embeddings.append(final_embedding)
-        final_embeddings = pd.concat(final_embeddings, axis=1)
+        final_embeddings = pd.concat(final_embeddings, axis=1).drop(
+                self._categorical_vars + self._numeric_vars, axis=1
+            )
 
-        final_x = pd.concat(
-            [X_copy.drop(self._categorical_vars, axis=1), final_embeddings], axis=1
-        )
-        final_x = final_x.loc[:, ~final_x.columns.duplicated()]
-        self.columns_out = final_x.columns
+        self.columns_out = final_embeddings.columns
 
-        return final_x
+        return final_embeddings
 
     def get_feature_names_out(self, input_features=None):
         return self.columns_out

@@ -6,21 +6,21 @@ Dense Feature Mixer (DFM) is a Scikit-Learn-compliant transformer that converts 
 
 ## Usage
 
-DFM works like any Scikit-Learn transformer, the only difference being that it requires `y` to be passed as it is the neural network's target.
+DFM works like any Scikit-Learn transformer, the only difference being that it requires `y` to be passed as it is the neural network's target. By default DFM will convert categorical variables into integer arrays by applying Scikit-Learn's `OrdinalEncoder`.
 
-The `numeric_vars` argument is optional. If available, these variables will be included as an additional input to the neural network. This may reduce the interpretability of the final model as the complete effect of numeric variables on the target variable can become unclear.
+It will assume that all input columns are categorical and will calculate embeddings for each, unless the `numeric_vars` argument is passed. If available, numeric variables will be included as an additional input to the neural network but no embeddings will be calculated for them, and they will not be included in the output transformation.
+
+Please not that including numeric variables may reduce the interpretability of the final model as the complete effect of numeric variables on the target variable can become unclear.
 
 ```python
 from dense_feature_mixer import DenseFeatureMixer
 
-dfm = DenseFeatureMixer(task="regression", categorical_vars=["..."], numeric_vars=["..."])
-dfm.fit(X=X_train, y=y_train)
-output = dfm.transform(X=X_train)
+dfm = DenseFeatureMixer(task="regression")
+dfm.fit(X=X_train[categorical_vars], y=y_train)
+output = dfm.transform(X=X_train[categorical_vars])
 ```
 
-By default DFM will convert categorical variables into integer arrays by applying scikit's `OrdinalEncoder`.
-
-DFM can be included in pipelines. However, if `categorical_vars` is specificed, DFM has to be the first step in the pipeline, or previous transformations have to be held inside the provided `ColumnTransformerWithNames`. This is because DFM requires its `X` input to be a `DataFrame` with proper column names, which cannot be guaranteed if previous transformations are applied as is.
+DFM can be included in pipelines. However, if `numeric_vars` is specificed, DFM has to be the first step in the pipeline, or previous transformations have to be held inside the provided `ColumnTransformerWithNames`. This is because DFM requires its `X` input to be a `DataFrame` with proper column names, which cannot be guaranteed if previous transformations are applied as is.
 
 ```python
 from sklearn.model_selection import train_test_split
@@ -33,8 +33,7 @@ from dense_feature_mixer import DenseFeatureMixer
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
 
-dfm = DenseFeatureMixer(task="classification", categorical_vars=categorical_vars,
-                        numeric_vars=numeric_vars, encode=True, unknown_category=999)
+dfm = DenseFeatureMixer(task="classification", numeric_vars=numeric_vars)
 num_pipe = make_pipeline(SimpleImputer(strategy="mean"), StandardScaler())
 cat_transformer = SimpleImputer(strategy="most_frequent")
 col_transformer = ColumnTransformerWithNames([("num_transformer", num_pipe, numeric_vars),
