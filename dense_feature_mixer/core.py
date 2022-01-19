@@ -16,10 +16,12 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
         unknown_category: int = 999,
         numeric_vars: Optional[List[str]] = None,
         dimensions: Optional[List[int]] = None,
+        layers_units: Optional[List[int]] = None,
+        dropout: float = 0.2,
         classif_classes: Optional[int] = None,
         classif_loss: Optional[str] = None,
         optimizer: str = "adam",
-        epochs: int = 10,
+        epochs: int = 3,
         batch_size: int = 32,
         verbose: int = 0,
     ):
@@ -47,6 +49,11 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
         dimensions :
             Array-like of integers containing the number of embedding dimensions for each categorical
             feature. If none, the dimension will be `min(50, int(np.ceil((unique + 1) / 2)))`
+        layers_units :
+            Array-like of integers which define how many dense layers to include and how many units
+            they should have. By default None, which creates two hidden layers with 24 and 12 units.
+        dropout :
+            Dropout rate used between dense layers.
         classif_classes :
             Number of classes in `y` for classification tasks.
         classif_loss : Optional[str], optional
@@ -54,7 +61,7 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
         optimizer :
             Optimizer, default "adam".
         epochs :
-            Number of epochs, default 10.
+            Number of epochs, default 3.
         batch_size : int, optional
             Batches size, default 32.
         verbose : int, optional
@@ -81,6 +88,8 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
         self.unknown_category = unknown_category
         self.numeric_vars = numeric_vars
         self.dimensions = dimensions
+        self.layers_units = layers_units
+        self.dropout = dropout
 
         if (classif_classes and not classif_loss) or (
             classif_loss and not classif_classes
@@ -102,17 +111,19 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
     ) -> DenseFeatureMixer:
         if self.numeric_vars and not isinstance(X, pd.DataFrame):
             raise ValueError("Cannot specify numeric_vars if X is not a DataFrame.")
-        self._numeric_vars = self.numeric_vars if self.numeric_vars else []
+        self._numeric_vars = self.numeric_vars or []
         if self.dimensions:
             if len(self.dimensions) != (X.shape[1] - len(self._numeric_vars)):
                 raise ValueError(
                     "Dimensions must be of same length as non-numeric variables"
                 )
+        self._layers_units = self.layers_units or [24, 12]
         X_copy = X.copy()
         if self.encode:
             self._validate_data(y=y)
         else:
             self._validate_data(X=X_copy, y=y)
+
         if isinstance(X_copy, pd.DataFrame):
             self._categorical_vars = [x for x in X_copy.columns if x not in self._numeric_vars]
         else:
@@ -159,9 +170,9 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
         else:
             x = all_categorical
             numeric_input = []
-        x = layers.Dense(32, activation="relu")(x)
-        x = layers.Dropout(0.2)(x)
-        x = layers.Dense(16, activation="relu")(x)
+        for units in self._layers_units:
+            x = layers.Dense(units, activation="relu")(x)
+            x = layers.Dropout(self.dropout)(x)
         if self.task == "regression":
             output = layers.Dense(1, activation="relu")(x)
             loss = "mse"
@@ -189,14 +200,12 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
                 else:
                     loss = "categorical_crossentropy"
             output = layers.Dense(output_units, activation=output_activation)(x)
-        if len(self._categorical_vars) > 1:
-            self._model = Model(inputs=[numeric_input] + categorical_inputs, outputs=output)
-        elif self._numeric_vars:
+        if len(self._categorical_vars) > 1 or self._numeric_vars:
             self._model = Model(inputs=[numeric_input] + categorical_inputs, outputs=output)
         else:
             self._model = Model(inputs=categorical_inputs[0], outputs=output)
-
         self._model.compile(optimizer=self.optimizer, loss=loss, metrics=metrics)
+
         numeric_x = [np.array(X_copy[self._numeric_vars]).astype(np.float32)] if self._numeric_vars else []
         merged_x = numeric_x + [X_copy[i].astype(np.float32) for i in self._categorical_vars]
         self._model.fit(
@@ -225,13 +234,14 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
         return self
 
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
-        X_copy = X.copy()
         if not X.shape[1] == len(self._categorical_vars) + len(self._numeric_vars):
             raise ValueError("X must have the same dimensions as used in training.")
+        X_copy = X.copy()
         if not isinstance(X_copy, pd.DataFrame):
             X_copy = pd.DataFrame(X_copy, columns=[f"cat{i}" for i in range(X_copy.shape[1])])
         if not all(i in X_copy.columns for i in self._categorical_vars):
             raise ValueError("X must contain all categorical variables.")
+
         if self.encode:
             X_copy[self._categorical_vars] = self._ordinal_encoder.transform(X_copy[self._categorical_vars])
         final_embeddings = []
