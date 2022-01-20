@@ -36,7 +36,13 @@ setup(
         "Programming Language :: Python :: 3.8",
         "Operating System :: OS Independent",
     ],
-    keywords=["machine learning", "neural network", "deep learning", "sklearn", "scikit-learn"],
+    keywords=[
+        "machine learning",
+        "neural network",
+        "deep learning",
+        "sklearn",
+        "scikit-learn",
+    ],
     install_requires=[
         "scikit-learn",
         "tensorflow",
