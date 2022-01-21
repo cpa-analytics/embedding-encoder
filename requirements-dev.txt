@@ -4,8 +4,6 @@
 #
 #    pip-compile requirements-dev.in
 #
-argcomplete==1.12.3
-    # via ipykernel
 argon2-cffi==21.3.0
     # via notebook
 argon2-cffi-bindings==21.2.0
@@ -22,10 +20,6 @@ cffi==1.15.0
     # via argon2-cffi-bindings
 click==8.0.3
     # via black
-colorama==0.4.4
-    # via
-    #   click
-    #   ipython
 debugpy==1.5.1
     # via ipykernel
 decorator==5.1.0
@@ -36,15 +30,6 @@ entrypoints==0.3
     # via
     #   jupyter-client
     #   nbconvert
-importlib-metadata==4.10.0
-    # via
-    #   -c requirements.txt
-    #   argcomplete
-    #   click
-    #   ipykernel
-    #   jsonschema
-importlib-resources==5.4.0
-    # via jsonschema
 ipykernel==6.6.0
     # via
     #   ipywidgets
@@ -52,7 +37,7 @@ ipykernel==6.6.0
     #   jupyter-console
     #   notebook
     #   qtconsole
-ipython==7.30.1
+ipython==7.31.1
     # via
     #   ipykernel
     #   ipywidgets
@@ -136,6 +121,8 @@ parso==0.8.3
     # via jedi
 pathspec==0.9.0
     # via black
+pexpect==4.8.0
+    # via ipython
 pickleshare==0.7.5
     # via ipython
 platformdirs==2.4.0
@@ -146,6 +133,10 @@ prompt-toolkit==3.0.24
     # via
     #   ipython
     #   jupyter-console
+ptyprocess==0.7.0
+    # via
+    #   pexpect
+    #   terminado
 pycparser==2.21
     # via cffi
 pygments==2.10.0
@@ -163,10 +154,6 @@ python-dateutil==2.8.2
     # via
     #   -c requirements.txt
     #   jupyter-client
-pywin32==303
-    # via jupyter-core
-pywinpty==1.1.6
-    # via terminado
 pyzmq==22.3.0
     # via
     #   jupyter-client
@@ -208,26 +195,16 @@ traitlets==5.1.1
     #   nbformat
     #   notebook
     #   qtconsole
-typed-ast==1.5.1
-    # via black
 typing-extensions==4.0.1
     # via
     #   -c requirements.txt
-    #   argon2-cffi
     #   black
-    #   importlib-metadata
-    #   jsonschema
 wcwidth==0.2.5
     # via prompt-toolkit
 webencodings==0.5.1
     # via bleach
 widgetsnbextension==3.5.2
     # via ipywidgets
-zipp==3.7.0
-    # via
-    #   -c requirements.txt
-    #   importlib-metadata
-    #   importlib-resources
 
 # The following packages are considered to be unsafe in a requirements file:
 # setuptools
