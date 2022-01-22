@@ -178,6 +178,7 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
                 X_copy, columns=[f"cat{i}" for i in range(X_copy.shape[1])]
             )
             self._categorical_vars = list(X_copy.columns)
+        self._fit_dtypes = X_copy.dtypes
 
         if self.encode:
             self._ordinal_encoder = OrdinalEncoder(
@@ -338,6 +339,40 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
         self.columns_out = final_embeddings.columns
 
         return final_embeddings
+
+    def inverse_transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """
+        Inverse transform X using computed variable embeddings.
+
+        Parameters
+        ----------
+        X :
+            The data to process.
+
+        Returns
+        -------
+        Original DataFrame.
+        """
+        X_copy = X.copy()
+
+        inverted_dfs = []
+        for k in self._categorical_vars:
+            mapping = self._embeddings_mapping[k]
+            embeddings_columns = list(mapping.columns)
+            mapping = mapping.reset_index().set_index(embeddings_columns)
+            inverted = X_copy[embeddings_columns].join(mapping, on=embeddings_columns)
+            inverted = inverted.drop(embeddings_columns, axis=1)
+            inverted = inverted.rename({"index": k}, axis=1)
+            inverted_dfs.append(inverted)
+        output = pd.concat(inverted_dfs, axis=1)
+
+        if self.encode:
+            original = self._ordinal_encoder.inverse_transform(output)
+            original = pd.DataFrame(original, columns=output.columns, index=X_copy.index)
+        else:
+            original = output
+        original = original.astype(dict(zip(original.columns, self._fit_dtypes)))
+        return original
 
     def get_feature_names_out(self, input_features=None):
         return self.columns_out
