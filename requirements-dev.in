@@ -1,3 +1,4 @@
 -c requirements.txt
 black
 jupyter
+ipython >= 7.31.1
