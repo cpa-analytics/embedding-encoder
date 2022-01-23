@@ -2,3 +2,4 @@
 black
 jupyter
 ipython >= 7.31.1
+pytest

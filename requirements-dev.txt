@@ -10,8 +10,12 @@ argon2-cffi==21.3.0
     # via notebook
 argon2-cffi-bindings==21.2.0
     # via argon2-cffi
+atomicwrites==1.4.0
+    # via pytest
 attrs==21.4.0
-    # via jsonschema
+    # via
+    #   jsonschema
+    #   pytest
 backcall==0.2.0
     # via ipython
 black==21.12b0
@@ -26,6 +30,7 @@ colorama==0.4.4
     # via
     #   click
     #   ipython
+    #   pytest
 debugpy==1.5.1
     # via ipykernel
 decorator==5.1.0
@@ -43,8 +48,12 @@ importlib-metadata==4.10.0
     #   click
     #   ipykernel
     #   jsonschema
+    #   pluggy
+    #   pytest
 importlib-resources==5.4.0
     # via jsonschema
+iniconfig==1.1.1
+    # via pytest
 ipykernel==6.6.0
     # via
     #   ipywidgets
@@ -130,6 +139,7 @@ notebook==6.4.6
 packaging==21.3
     # via
     #   bleach
+    #   pytest
     #   qtpy
 pandocfilters==1.5.0
     # via nbconvert
@@ -141,12 +151,16 @@ pickleshare==0.7.5
     # via ipython
 platformdirs==2.4.0
     # via black
+pluggy==1.0.0
+    # via pytest
 prometheus-client==0.12.0
     # via notebook
 prompt-toolkit==3.0.24
     # via
     #   ipython
     #   jupyter-console
+py==1.11.0
+    # via pytest
 pycparser==2.21
     # via cffi
 pygments==2.10.0
@@ -160,6 +174,8 @@ pyparsing==3.0.6
     # via packaging
 pyrsistent==0.18.0
     # via jsonschema
+pytest==6.2.5
+    # via -r requirements-dev.in
 python-dateutil==2.8.2
     # via
     #   -c requirements.txt
@@ -188,6 +204,8 @@ terminado==0.12.1
     # via notebook
 testpath==0.5.0
     # via nbconvert
+toml==0.10.2
+    # via pytest
 tomli==1.2.3
     # via black
 tornado==6.1
