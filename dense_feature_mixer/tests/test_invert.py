@@ -1,10 +1,6 @@
-import random
-
 import pytest
 import pandas as pd
 import numpy as np
-import tensorflow as tf
-from sklearn.preprocessing import OrdinalEncoder
 
 from dense_feature_mixer import DenseFeatureMixer
 from dense_feature_mixer.tests.test_basics import set_all_seeds
