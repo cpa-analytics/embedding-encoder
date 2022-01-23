@@ -3,6 +3,7 @@ from typing import List, Optional, Union
 
 import pandas as pd
 import numpy as np
+import tensorflow as tf
 from tensorflow.keras import layers, Model, callbacks
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.preprocessing import OrdinalEncoder
@@ -224,7 +225,7 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
             x = layers.Dropout(self.dropout)(x)
 
         if self.task == "regression":
-            output = layers.Dense(1, activation="relu")(x)
+            output = layers.Dense(1)(x)
             loss = "mse"
             metrics = [loss]
         else:
@@ -236,7 +237,7 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
                 nunique_y = len(np.unique(y))
                 if y.ndim == 1 and nunique_y == 2:
                     output_units = 1
-                elif y.dim == 1 and nunique_y > 2:
+                elif y.ndim == 1 and nunique_y > 2:
                     output_units = nunique_y
                 else:
                     output_units = y.shape[1]
@@ -245,10 +246,9 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
                 loss = "binary_crossentropy"
             else:
                 output_activation = "softmax"
-                if y.dim == 1:
-                    loss = "sparse_categorical_crossentropy"
-                else:
-                    loss = "categorical_crossentropy"
+                if y.ndim == 1:
+                    y = tf.one_hot(y, output_units)
+                loss = "categorical_crossentropy"
             output = layers.Dense(output_units, activation=output_activation)(x)
 
         if len(self._categorical_vars) > 1 or self._numeric_vars:
