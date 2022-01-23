@@ -278,8 +278,11 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
             batch_size=self.batch_size,
             verbose=self.verbose,
             validation_split=self.validation_split,
-            callbacks=[callbacks.EarlyStopping(monitor=monitor, patience=2,
-                                               restore_best_weights=True)]
+            callbacks=[
+                callbacks.EarlyStopping(
+                    monitor=monitor, patience=2, restore_best_weights=True
+                )
+            ],
         )
 
         self._weights = {
@@ -368,7 +371,9 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
 
         if self.encode:
             original = self._ordinal_encoder.inverse_transform(output)
-            original = pd.DataFrame(original, columns=output.columns, index=X_copy.index)
+            original = pd.DataFrame(
+                original, columns=output.columns, index=X_copy.index
+            )
         else:
             original = output
         original = original.astype(dict(zip(original.columns, self._fit_dtypes)))
