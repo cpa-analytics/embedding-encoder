@@ -3,3 +3,9 @@ black
 jupyter
 ipython >= 7.31.1
 pytest
+sphinx
+sphinx-autobuild
+sphinx-autodoc-typehints
+recommonmark
+sphinx-bootstrap-theme
+sphinx-toolbox

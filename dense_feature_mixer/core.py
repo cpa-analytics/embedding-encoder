@@ -10,6 +10,79 @@ from sklearn.preprocessing import OrdinalEncoder
 
 
 class DenseFeatureMixer(BaseEstimator, TransformerMixin):
+    """Obtain numeric embeddings from categorical variables.
+
+    Dense Feature Mixer trains a small neural network with categorical inputs passed through
+    embedding layers. Numeric variables can be included as additional inputs by setting
+    `numeric_vars`.
+
+    By default, non numeric variables are encoded with scikit-learn's `OrdinalEncoder`. This
+    can be changed by setting `encode=False` if no encoding is necessary.
+
+    DFM returns (unique_values + 1) / 2 vectors per categorical variable, with a minimum of 2
+    and a maximum of 50. However, this can be changed by passing a list of integers to `dimensions`.
+
+    The neural network architecture and training loop can be partially modified. `layers_units`
+    takes an array of integers, each representing an additional dense layer, i.e, `[32, 24, 16]`
+    will create 3 hidden layers with the corresponding units, with dropout layers interleaved,
+    while `dropout` controls the dropout rate.
+
+    While DFM will try to infer the appropiate number of units for the output layer and the
+    model's loss for classification tasks, these can be set with `classif_classes` and
+    `classif_loss`. Regression tasks will always have 1 unit in the output layer and mean
+    squared error loss.
+
+    `optimizer` and `batch_size` are passed directly to Keras.
+
+    `validation_split` is also passed to Keras. Setting it to something higher than 0 will use
+    validation loss in order to decide whether to stop training early. Otherwise train loss
+    will be used.
+
+    Parameters
+    ----------
+    task :
+        "regression" or "classification". This determines the units in the head layer, loss and
+        metrics used.
+    encode :
+        Whether to apply `OrdinalEncoder` to categorical variables, by default True.
+    unknown_category :
+        Out of vocabulary values will be mapped to this category. This should match the unknown
+        value used in OrdinalEncoder.
+    numeric_vars :
+        Array-like of strings containing the names of the numeric variables that will be included
+        as inputs to the network.
+    dimensions :
+        Array-like of integers containing the number of embedding dimensions for each categorical
+        feature. If none, the dimension will be `min(50, int(np.ceil((unique + 1) / 2)))`
+    layers_units :
+        Array-like of integers which define how many dense layers to include and how many units
+        they should have. By default None, which creates two hidden layers with 24 and 12 units.
+    dropout :
+        Dropout rate used between dense layers.
+    classif_classes :
+        Number of classes in `y` for classification tasks.
+    classif_loss : Optional[str], optional
+        Loss function for classification tasks.
+    optimizer :
+        Optimizer, default "adam".
+    epochs :
+        Number of epochs, default 3.
+    batch_size :
+        Batches size, default 32.
+    validation_split :
+        Passed to Keras `Model.fit`.
+    verbose :
+        Verbosity of the Keras `Model.fit`, default 0.
+
+    Raises
+    ------
+    ValueError
+        If `task` is not "regression" or "classification".
+    ValueError
+        If `classif_classes` or `classif_loss` are specified for regression tasks.
+    ValueError
+        If `classif_classes` is specified but `classif_loss` is not.
+    """
     def __init__(
         self,
         task: str,
@@ -27,79 +100,6 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
         validation_split: float = 0.2,
         verbose: int = 0,
     ):
-        """Obtain numeric embeddings from categorical variables.
-
-        Dense Feature Mixer trains a small neural network with categorical inputs passed through
-        embedding layers. Numeric variables can be included as additional inputs by setting
-        `numeric_vars`.
-
-        By default, non numeric variables are encoded with Scikit-Learn's `OrdinalEncoder`. This
-        can be changed by setting `encode=False` if no encoding is necessary.
-
-        DFM returns (unique_values + 1) / 2 vectors per categorical variable, with a minimum of 2
-        and a maximum of 50. However, this can be changed by passing a list of integers to `dimensions`.
-
-        The neural network architecture and training loop can be partially modified. `layers_units`
-        takes an array of integers, each representing an additional dense layer, i.e, `[32, 24, 16]`
-        will create 3 hidden layers with the corresponding units, with dropout layers interleaved,
-        while `dropout` controls the dropout rate.
-
-        While DFM will try to infer the appropiate number of units for the output layer and the
-        model's loss for classification tasks, these can be set with `classif_classes` and
-        `classif_loss`. Regression tasks will always have 1 unit in the output layer and mean
-        squared error loss.
-
-        `optimizer` and `batch_size` are passed directly to Keras.
-
-        `validation_split` is also passed to Keras. Setting it to something higher than 0 will use
-        validation loss in order to decide whether to stop training early. Otherwise train loss
-        will be used.
-
-        Parameters
-        ----------
-        task :
-            "regression" or "classification". This determines the units in the head layer, loss and
-            metrics used.
-        encode :
-            Whether to apply `OrdinalEncoder` to categorical variables, by default True.
-        unknown_category :
-            Out of vocabulary values will be mapped to this category. This should match the unknown
-            value used in OrdinalEncoder.
-        numeric_vars :
-            Array-like of strings containing the names of the numeric variables that will be included
-            as inputs to the network.
-        dimensions :
-            Array-like of integers containing the number of embedding dimensions for each categorical
-            feature. If none, the dimension will be `min(50, int(np.ceil((unique + 1) / 2)))`
-        layers_units :
-            Array-like of integers which define how many dense layers to include and how many units
-            they should have. By default None, which creates two hidden layers with 24 and 12 units.
-        dropout :
-            Dropout rate used between dense layers.
-        classif_classes :
-            Number of classes in `y` for classification tasks.
-        classif_loss : Optional[str], optional
-            Loss function for classification tasks.
-        optimizer :
-            Optimizer, default "adam".
-        epochs :
-            Number of epochs, default 3.
-        batch_size :
-            Batches size, default 32.
-        validation_split :
-            Passed to Keras `Model.fit`.
-        verbose :
-            Verbosity of the Keras `Model.fit`, default 0.
-
-        Raises
-        ------
-        ValueError
-            If `task` is not "regression" or "classification".
-        ValueError
-            If `classif_classes` or `classif_loss` are specified for regression tasks.
-        ValueError
-            If `classif_classes` is specified but `classif_loss` is not.
-        """
         if not task in ["regression", "classification"]:
             raise ValueError("task must be either regression or classification")
         self.task = task

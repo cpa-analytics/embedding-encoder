@@ -17,7 +17,7 @@ with open(os.path.join(here, "README.md"), encoding="utf-8") as f:
 setup(
     name="dense-feature-mixer",
     version=main_ns["__version__"],
-    description="Scikit-learn compatible transformer that turns categorical features into numeric embeddings",
+    description="scikit-learn compatible transformer that turns categorical features into dense numeric embeddings",
     long_description=long_description,
     long_description_content_type="text/markdown",
     author="CPA Ferrere | Data Analytics",
