@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 from distutils.util import convert_path
 
 main_ns = {}
-ver_path = convert_path("dense_feature_mixer/_version.py")
+ver_path = convert_path("embedding_encoder/_version.py")
 with open(ver_path) as ver_file:
     exec(ver_file.read(), main_ns)
 
@@ -15,14 +15,14 @@ with open(os.path.join(here, "README.md"), encoding="utf-8") as f:
     long_description = f.read()
 
 setup(
-    name="dense-feature-mixer",
+    name="embedding-encoder",
     version=main_ns["__version__"],
-    description="Scikit-learn compatible transformer that turns categorical features into numeric embeddings",
+    description="scikit-learn compatible transformer that turns categorical features into dense numeric embeddings",
     long_description=long_description,
     long_description_content_type="text/markdown",
     author="CPA Ferrere | Data Analytics",
     license="MIT",
-    url="https://github.com/cpa-ferrere/DenseFeatureMixer",
+    url="https://github.com/cpa-ferrere/EmbeddingEncoder",
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Science/Research",
