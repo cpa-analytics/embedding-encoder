@@ -2,8 +2,8 @@ import pytest
 import pandas as pd
 import numpy as np
 
-from dense_feature_mixer import DenseFeatureMixer
-from dense_feature_mixer.tests.test_basics import set_all_seeds
+from embedding_encoder import EmbeddingEncoder
+from embedding_encoder.tests.test_basics import set_all_seeds
 
 
 set_all_seeds(0)
@@ -28,10 +28,10 @@ def test_inverse_transform(task, numeric_vars, categorical_vars, target, dimensi
     )
     y = np.array(target)
     numeric_vars = numeric_vars or []
-    dfm = DenseFeatureMixer(
+    ee = EmbeddingEncoder(
         task=task, numeric_vars=numeric_vars, dimensions=dimensions, epochs=1
     )
-    dfm.fit(X[categorical_vars + numeric_vars], y)
-    X_transformed = dfm.transform(X[categorical_vars + numeric_vars])
-    inverted = dfm.inverse_transform(X_transformed)
+    ee.fit(X[categorical_vars + numeric_vars], y)
+    X_transformed = ee.transform(X[categorical_vars + numeric_vars])
+    inverted = ee.inverse_transform(X_transformed)
     assert np.array_equal(inverted, X[categorical_vars])

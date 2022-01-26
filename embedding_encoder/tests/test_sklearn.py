@@ -7,8 +7,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
 
-from dense_feature_mixer import DenseFeatureMixer
-from dense_feature_mixer.tests.test_basics import set_all_seeds
+from embedding_encoder import EmbeddingEncoder
+from embedding_encoder.tests.test_basics import set_all_seeds
 
 
 set_all_seeds(0)
@@ -25,8 +25,8 @@ def test_pipeline_cv():
     y = np.array([1, 0, 1, 0, 1, 0])
     numeric_vars = ["C"]
     categorical_vars = ["A", "B"]
-    dfm = DenseFeatureMixer(task="classification", epochs=1)
-    cat_transformer = make_pipeline(SimpleImputer(strategy="most_frequent"), dfm)
+    ee = EmbeddingEncoder(task="classification", epochs=1)
+    cat_transformer = make_pipeline(SimpleImputer(strategy="most_frequent"), ee)
     preprocessor = ColumnTransformer(
         [
             ("num", StandardScaler(), numeric_vars),
@@ -35,7 +35,7 @@ def test_pipeline_cv():
     )
     pipeline = make_pipeline(preprocessor, LogisticRegression())
     param_grid = {
-        "columntransformer__cat__densefeaturemixer__layers_units": [
+        "columntransformer__cat__embeddingencoder__layers_units": [
             [64, 32, 16],
             [16, 8],
         ]

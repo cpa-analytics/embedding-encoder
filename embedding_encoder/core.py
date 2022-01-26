@@ -9,17 +9,17 @@ from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.preprocessing import OrdinalEncoder
 
 
-class DenseFeatureMixer(BaseEstimator, TransformerMixin):
+class EmbeddingEncoder(BaseEstimator, TransformerMixin):
     """Obtain numeric embeddings from categorical variables.
 
-    Dense Feature Mixer trains a small neural network with categorical inputs passed through
+    Embedding Encoder trains a small neural network with categorical inputs passed through
     embedding layers. Numeric variables can be included as additional inputs by setting
     `numeric_vars`.
 
     By default, non numeric variables are encoded with scikit-learn's `OrdinalEncoder`. This
     can be changed by setting `encode=False` if no encoding is necessary.
 
-    DFM returns (unique_values + 1) / 2 vectors per categorical variable, with a minimum of 2
+    Embedding Encoder returns (unique_values + 1) / 2 vectors per categorical variable, with a minimum of 2
     and a maximum of 50. However, this can be changed by passing a list of integers to `dimensions`.
 
     The neural network architecture and training loop can be partially modified. `layers_units`
@@ -27,7 +27,7 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
     will create 3 hidden layers with the corresponding units, with dropout layers interleaved,
     while `dropout` controls the dropout rate.
 
-    While DFM will try to infer the appropiate number of units for the output layer and the
+    While Embedding Encoder will try to infer the appropiate number of units for the output layer and the
     model's loss for classification tasks, these can be set with `classif_classes` and
     `classif_loss`. Regression tasks will always have 1 unit in the output layer and mean
     squared error loss.
@@ -133,9 +133,9 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
         self,
         X: pd.DataFrame,
         y: Union[pd.DataFrame, pd.Series],
-    ) -> DenseFeatureMixer:
+    ) -> EmbeddingEncoder:
         """
-        Fit the DenseFeatureMixer to X.
+        Fit the EmbeddingEncoder to X.
 
         Parameters
         ----------
@@ -149,7 +149,7 @@ class DenseFeatureMixer(BaseEstimator, TransformerMixin):
         Returns
         -------
         self : object
-            Fitted DFM.
+            Fitted Embedding Encoder.
         """
         self._numeric_vars = self.numeric_vars or []
         self._layers_units = self.layers_units or [24, 12]

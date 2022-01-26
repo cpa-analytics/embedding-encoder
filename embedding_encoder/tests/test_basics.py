@@ -6,7 +6,7 @@ import numpy as np
 import tensorflow as tf
 from sklearn.preprocessing import OrdinalEncoder
 
-from dense_feature_mixer import DenseFeatureMixer
+from embedding_encoder import EmbeddingEncoder
 
 
 def set_all_seeds(seed: int):
@@ -38,9 +38,9 @@ def test_inputs(task, numeric_vars, categorical_vars, target):
     )
     y = np.array(target)
     numeric_vars = numeric_vars or []
-    dfm = DenseFeatureMixer(task=task, numeric_vars=numeric_vars, epochs=1)
-    dfm.fit(X[categorical_vars + numeric_vars], y)
-    X_transformed = dfm.transform(X[categorical_vars + numeric_vars])
+    ee = EmbeddingEncoder(task=task, numeric_vars=numeric_vars, epochs=1)
+    ee.fit(X[categorical_vars + numeric_vars], y)
+    X_transformed = ee.transform(X[categorical_vars + numeric_vars])
     n_cols = 2 * len(categorical_vars)
     assert X_transformed.shape == (X.shape[0], n_cols)
 
@@ -48,9 +48,9 @@ def test_inputs(task, numeric_vars, categorical_vars, target):
 def test_array_X():
     X = np.array([["x", 1], ["y", 2], ["z", 3]])
     y = np.array([1, 0, 0])
-    dfm = DenseFeatureMixer(task="classification", epochs=1)
-    dfm.fit(X, y)
-    X_transformed = dfm.transform(X)
+    ee = EmbeddingEncoder(task="classification", epochs=1)
+    ee.fit(X, y)
+    X_transformed = ee.transform(X)
     assert X_transformed.shape == (X.shape[0], 4)
 
 
@@ -60,14 +60,14 @@ def test_basic_parameters(encode, dimensions):
         {"A": ["a", "b", "c", "d", "e", "f"], "B": ["z", "y", "x", "w", "v", "u"]}
     )
     y = np.array([1, 0, 1, 0, 1, 0])
-    dfm = DenseFeatureMixer(
+    ee = EmbeddingEncoder(
         task="classification", encode=encode, epochs=1, dimensions=dimensions
     )
     if encode is False:
         encoder = OrdinalEncoder()
         X[["A", "B"]] = encoder.fit_transform(X[["A", "B"]])
-    dfm.fit(X, y)
-    X_transformed = dfm.transform(X)
+    ee.fit(X, y)
+    X_transformed = ee.transform(X)
     # 7 unique values, + 1 for oov, divided by 2 and rounded up = 4 * 2 variables = 8
     n_cols = sum(dimensions) if dimensions else 8
     assert X_transformed.shape == (X.shape[0], n_cols)
@@ -82,14 +82,14 @@ def test_nn_parameters(layers_units, dropout, validation_split):
         {"A": ["a", "b", "c", "d", "e", "f"], "B": ["z", "y", "x", "w", "v", "u"]}
     )
     y = np.array([1, 0, 1, 0, 1, 0])
-    dfm = DenseFeatureMixer(
+    ee = EmbeddingEncoder(
         task="classification",
         epochs=1,
         layers_units=layers_units,
         dropout=dropout,
         validation_split=validation_split,
     )
-    dfm.fit(X, y)
-    X_transformed = dfm.transform(X)
+    ee.fit(X, y)
+    X_transformed = ee.transform(X)
     # 7 unique values, + 1 for oov, divided by 2 and rounded up = 4 * 2 variables = 8
     assert X_transformed.shape == (X.shape[0], 8)
