@@ -17,14 +17,14 @@ import sphinx_autodoc_typehints
 from shutil import copyfile
 
 sys.path.insert(0, os.path.abspath("../../"))
-from dense_feature_mixer._version import __version__
+from embedding_encoder._version import __version__
 
 copyfile("../../README.md", "README.md")
 
 
 # -- Project information -----------------------------------------------------
 
-project = 'Dense Feature Mixer'
+project = 'Embedding Encoder'
 copyright = '2022, CPA Ferrere | Data Analytics'
 author = 'CPA Ferrere | Data Analytics'
 
