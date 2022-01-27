@@ -6,7 +6,7 @@ Embedding Encoder is a scikit-learn-compliant transformer that converts categori
 
 ## Installation and dependencies
 
-Embedding Encoder can be installed (soon) with
+Embedding Encoder can be installed with
 
 ```bash
 pip install embedding-encoder
