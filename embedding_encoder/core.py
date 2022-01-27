@@ -73,6 +73,19 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
         Passed to Keras `Model.fit`.
     verbose :
         Verbosity of the Keras `Model.fit`, default 0.
+    keep_model :
+        Whether to assign the Tensorflow model to :attr:`_model`. Setting to True will prevent the
+        EmbeddingEncoder from being pickled. Default False. Please note that the model's `history`
+        dict is available at :attr:`history`.
+
+    Attributes
+    ----------
+    _history : `dict`
+        Keras `model.history.history` containing training data.
+    _model : `keras.Model`
+        Keras model. Only available if :attr:`keep_model` is True.
+    _embeddings_mapping : dict
+        Dictionary mapping categorical variables to their embeddings.
 
     Raises
     ------
@@ -83,6 +96,9 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
     ValueError
         If `classif_classes` is specified but `classif_loss` is not.
     """
+
+    _required_parameters = ["task"]
+
     def __init__(
         self,
         task: str,
@@ -99,6 +115,7 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
         batch_size: int = 32,
         validation_split: float = 0.2,
         verbose: int = 0,
+        keep_model: bool = False,
     ):
         if not task in ["regression", "classification"]:
             raise ValueError("task must be either regression or classification")
@@ -128,6 +145,15 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
         self.batch_size = batch_size
         self.validation_split = validation_split
         self.verbose = verbose
+        self.keep_model = keep_model
+
+    def _more_tags(self):
+        return {
+            "requires_y": True,
+            "non_deterministic": True,
+            "X_types": ["2darray", "string"],
+            "_xfail_checks": {"check_fit_idempotent": "EE is non-deterministic"},
+        }
 
     def fit(
         self,
@@ -151,6 +177,17 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
         self : object
             Fitted Embedding Encoder.
         """
+        if not isinstance(X, (pd.DataFrame, np.ndarray)):
+            X = np.array(X)
+        if not isinstance(y, (pd.DataFrame, np.ndarray)):
+            y = np.array(y)
+        try:
+            self._validate_data(X=X, y=y, dtype=None, ensure_min_samples=3)
+        except ValueError as error:
+            if "Expected 2D array" in str(error):
+                raise ValueError("EmbeddingEncoder does not accept sparse data.")
+            else:
+                raise error
         self._numeric_vars = self.numeric_vars or []
         self._layers_units = self.layers_units or [24, 12]
 
@@ -163,20 +200,15 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
                     "Dimensions must be of same length as non-numeric variables"
                 )
 
-        X_copy = X.copy()
-        if self.encode:
-            self._validate_data(y=y)
-        else:
-            self._validate_data(X=X_copy, y=y)
-
-        if isinstance(X_copy, pd.DataFrame):
+        if isinstance(X, pd.DataFrame):
+            X_copy = X.copy()
             self._categorical_vars = [
-                x for x in X_copy.columns if x not in self._numeric_vars
+                col for col in X_copy.columns if col not in self._numeric_vars
             ]
         else:
             # Assume it's a numpy array and that all columns are categorical
             X_copy = pd.DataFrame(
-                X_copy, columns=[f"cat{i}" for i in range(X_copy.shape[1])]
+                np.copy(X), columns=[f"cat{i}" for i in range(X.shape[1])]
             )
             self._categorical_vars = list(X_copy.columns)
         self._fit_dtypes = X_copy.dtypes
@@ -252,12 +284,10 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
             output = layers.Dense(output_units, activation=output_activation)(x)
 
         if len(self._categorical_vars) > 1 or self._numeric_vars:
-            self._model = Model(
-                inputs=[numeric_input] + categorical_inputs, outputs=output
-            )
+            model = Model(inputs=[numeric_input] + categorical_inputs, outputs=output)
         else:
-            self._model = Model(inputs=categorical_inputs[0], outputs=output)
-        self._model.compile(optimizer=self.optimizer, loss=loss, metrics=metrics)
+            model = Model(inputs=categorical_inputs[0], outputs=output)
+        model.compile(optimizer=self.optimizer, loss=loss, metrics=metrics)
 
         numeric_x = (
             [np.array(X_copy[self._numeric_vars]).astype(np.float32)]
@@ -271,7 +301,7 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
             monitor = "val_loss"
         else:
             monitor = "loss"
-        self._history = self._model.fit(
+        history = model.fit(
             x=merged_x,
             y=y,
             epochs=self.epochs,
@@ -284,10 +314,12 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
                 )
             ],
         )
+        self._history = history.history
+        if self.keep_model:
+            self._model = model
 
         self._weights = {
-            k: self._model.get_layer(f"embedding_{k}").weights
-            for k in self._categorical_vars
+            k: model.get_layer(f"embedding_{k}").weights for k in self._categorical_vars
         }
         self._embeddings_mapping = {
             k: pd.DataFrame(
@@ -299,6 +331,10 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
             )
             for k in self._categorical_vars
         }
+        columns_out = []
+        for k in self._embeddings_mapping.values():
+            columns_out.extend(k.columns)
+        self._columns_out = columns_out
 
         return self
 
@@ -316,6 +352,9 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
         embeddings :
             Vector embeddings for each categorical variable.
         """
+        if not isinstance(X, (pd.DataFrame, np.ndarray)):
+            X = np.array(X)
+        self._validate_data(X=X, dtype=None)
         if not X.shape[1] == len(self._categorical_vars) + len(self._numeric_vars):
             raise ValueError("X must have the same dimensions as used in training.")
 
@@ -339,7 +378,8 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
             self._categorical_vars + self._numeric_vars, axis=1
         )
 
-        self.columns_out = final_embeddings.columns
+        if isinstance(X, np.ndarray):
+            final_embeddings = np.array(final_embeddings, dtype=X.dtype)
 
         return final_embeddings
 
@@ -356,6 +396,8 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
         -------
         Original DataFrame.
         """
+        if not isinstance(X, (pd.DataFrame, np.ndarray)):
+            X = np.array(X)
         X_copy = X.copy()
 
         inverted_dfs = []
@@ -380,7 +422,7 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
         return original
 
     def get_feature_names_out(self, input_features=None):
-        return self.columns_out
+        return self._columns_out
 
     def get_feature_names(self, input_features=None):
-        return self.columns_out
+        return self._columns_out
