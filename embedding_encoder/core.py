@@ -78,6 +78,15 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
         EmbeddingEncoder from being pickled. Default False. Please note that the model's `history`
         dict is available at :attr:`history`.
 
+    Attributes
+    ----------
+    _history : `dict`
+        Keras `model.history.history` containing training data.
+    _model : `keras.Model`
+        Keras model. Only available if :attr:`keep_model` is True.
+    _embeddings_mapping : dict
+        Dictionary mapping categorical variables to their embeddings.
+
     Raises
     ------
     ValueError

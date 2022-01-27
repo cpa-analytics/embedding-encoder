@@ -18,6 +18,10 @@ Embedding Encoder has the following dependencies
 * numpy
 * pandas
 
+## Documentation
+
+Full documentation including this readme and API reference can be found at [RTD](https://embedding-encoder.readthedocs.io/en/latest).
+
 ## Usage
 
 Embedding Encoder works like any scikit-learn transformer, the only difference being that it requires `y` to be passed as it is the neural network's target. By default it will convert categorical variables into integer arrays by applying scikit-learn's `OrdinalEncoder`.
