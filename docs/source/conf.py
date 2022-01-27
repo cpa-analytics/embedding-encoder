@@ -24,9 +24,9 @@ copyfile("../../README.md", "README.md")
 
 # -- Project information -----------------------------------------------------
 
-project = 'Embedding Encoder'
-copyright = '2022, CPA Ferrere | Data Analytics'
-author = 'CPA Ferrere | Data Analytics'
+project = "Embedding Encoder"
+copyright = "2022, CPA Ferrere | Data Analytics"
+author = "CPA Ferrere | Data Analytics"
 
 # The full version, including alpha/beta/rc tags
 release = __version__
@@ -61,7 +61,7 @@ exclude_patterns = []
 #
 html_theme = "bootstrap"
 html_theme_path = sphinx_bootstrap_theme.get_html_theme_path()
-#html_logo = "_static/....png"
+# html_logo = "_static/....png"
 html_theme_options = {
     "navbar_title": " ",
     "navbar_site_name": "Sections",
@@ -71,7 +71,7 @@ html_theme_options = {
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ['_static']
+html_static_path = ["_static"]
 
 autodoc_member_order = "bysource"
 add_function_parentheses = True

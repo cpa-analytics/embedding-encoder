@@ -139,10 +139,12 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
         self.keep_model = keep_model
 
     def _more_tags(self):
-        return {"requires_y": True,
-                "non_deterministic": True,
-                "X_types": ["2darray", "string"],
-                "_xfail_checks": {"check_fit_idempotent": "EE is non-deterministic"}}
+        return {
+            "requires_y": True,
+            "non_deterministic": True,
+            "X_types": ["2darray", "string"],
+            "_xfail_checks": {"check_fit_idempotent": "EE is non-deterministic"},
+        }
 
     def fit(
         self,
@@ -273,9 +275,7 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
             output = layers.Dense(output_units, activation=output_activation)(x)
 
         if len(self._categorical_vars) > 1 or self._numeric_vars:
-            model = Model(
-                inputs=[numeric_input] + categorical_inputs, outputs=output
-            )
+            model = Model(inputs=[numeric_input] + categorical_inputs, outputs=output)
         else:
             model = Model(inputs=categorical_inputs[0], outputs=output)
         model.compile(optimizer=self.optimizer, loss=loss, metrics=metrics)
@@ -310,8 +310,7 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
             self._model = model
 
         self._weights = {
-            k: model.get_layer(f"embedding_{k}").weights
-            for k in self._categorical_vars
+            k: model.get_layer(f"embedding_{k}").weights for k in self._categorical_vars
         }
         self._embeddings_mapping = {
             k: pd.DataFrame(
