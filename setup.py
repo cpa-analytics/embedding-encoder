@@ -45,9 +45,9 @@ setup(
     ],
     install_requires=[
         "scikit-learn",
-        "tensorflow",
         "pandas",
     ],
+    extras_require={"tf": ["tensorflow"]},
     include_package_data=True,
     packages=packages,
     python_requires=">=3.6",
