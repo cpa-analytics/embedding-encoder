@@ -152,6 +152,7 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
             "requires_y": True,
             "non_deterministic": True,
             "X_types": ["2darray", "string"],
+            "preserves_dtype": [],
             "_xfail_checks": {"check_fit_idempotent": "EE is non-deterministic"},
         }
 
@@ -379,7 +380,7 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
         )
 
         if isinstance(X, np.ndarray):
-            final_embeddings = np.array(final_embeddings, dtype=X.dtype)
+            final_embeddings = np.array(final_embeddings)
 
         return final_embeddings
 
