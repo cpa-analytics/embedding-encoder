@@ -1,10 +1,10 @@
 from __future__ import annotations
-from typing import List, Optional, Union
+import json
+from typing import List, Optional, Union, Dict
+from pathlib import Path
 
 import pandas as pd
 import numpy as np
-import tensorflow as tf
-from tensorflow.keras import layers, Model, callbacks
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.preprocessing import OrdinalEncoder
 
@@ -14,29 +14,33 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
 
     Embedding Encoder trains a small neural network with categorical inputs passed through
     embedding layers. Numeric variables can be included as additional inputs by setting
-    `numeric_vars`.
+    :attr:`numeric_vars`.
 
     By default, non numeric variables are encoded with scikit-learn's `OrdinalEncoder`. This
     can be changed by setting `encode=False` if no encoding is necessary.
 
     Embedding Encoder returns (unique_values + 1) / 2 vectors per categorical variable, with a minimum of 2
-    and a maximum of 50. However, this can be changed by passing a list of integers to `dimensions`.
+    and a maximum of 50. However, this can be changed by passing a list of integers to :attr:`dimensions`.
 
-    The neural network architecture and training loop can be partially modified. `layers_units`
+    The neural network architecture and training loop can be partially modified. :attr:`layers_units`
     takes an array of integers, each representing an additional dense layer, i.e, `[32, 24, 16]`
     will create 3 hidden layers with the corresponding units, with dropout layers interleaved,
-    while `dropout` controls the dropout rate.
+    while :attr:`dropout` controls the dropout rate.
 
     While Embedding Encoder will try to infer the appropiate number of units for the output layer and the
-    model's loss for classification tasks, these can be set with `classif_classes` and
-    `classif_loss`. Regression tasks will always have 1 unit in the output layer and mean
+    model's loss for classification tasks, these can be set with :attr:`classif_classes` and
+    :attr:`classif_loss`. Regression tasks will always have 1 unit in the output layer and mean
     squared error loss.
 
-    `optimizer` and `batch_size` are passed directly to Keras.
+    :attr:`optimizer` and :attr:`batch_size` are passed directly to Keras.
 
-    `validation_split` is also passed to Keras. Setting it to something higher than 0 will use
+    :attr:`validation_split` is also passed to Keras. Setting it to something higher than 0 will use
     validation loss in order to decide whether to stop training early. Otherwise train loss
     will be used.
+
+    :attr:`mapping_path` is the path to a JSON file where the embedding mapping will be saved. If
+    :attr:`pretrained` is set to True, the mapping will be loaded from this file and no model will
+    be trained.
 
     Parameters
     ----------
@@ -73,6 +77,12 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
         Passed to Keras `Model.fit`.
     verbose :
         Verbosity of the Keras `Model.fit`, default 0.
+    mapping_path :
+        Path to a JSON file where the mapping from categorical variables to embeddings will be saved.
+        If :attr:`pretrained` is True, the mapping will be loaded from this file and no model will
+        be trained.
+    pretrained :
+        Whether to use pretrained embeddings found in the JSON at :attr:`mapping_path`.
     keep_model :
         Whether to assign the Tensorflow model to :attr:`_model`. Setting to True will prevent the
         EmbeddingEncoder from being pickled. Default False. Please note that the model's `history`
@@ -115,6 +125,8 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
         batch_size: int = 32,
         validation_split: float = 0.2,
         verbose: int = 0,
+        mapping_path: Optional[Union[str, Path]] = None,
+        pretrained: bool = False,
         keep_model: bool = False,
     ):
         if not task in ["regression", "classification"]:
@@ -145,6 +157,10 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
         self.batch_size = batch_size
         self.validation_split = validation_split
         self.verbose = verbose
+        if pretrained is True and not mapping_path:
+            raise ValueError("mapping_path must be specified when pretrained is True")
+        self.mapping_path = mapping_path
+        self.pretrained = pretrained
         self.keep_model = keep_model
 
     def _more_tags(self):
@@ -152,6 +168,7 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
             "requires_y": True,
             "non_deterministic": True,
             "X_types": ["2darray", "string"],
+            "preserves_dtype": [],
             "_xfail_checks": {"check_fit_idempotent": "EE is non-deterministic"},
         }
 
@@ -189,7 +206,6 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
             else:
                 raise error
         self._numeric_vars = self.numeric_vars or []
-        self._layers_units = self.layers_units or [24, 12]
 
         if self._numeric_vars and not isinstance(X, pd.DataFrame):
             raise ValueError("Cannot specify numeric_vars if X is not a DataFrame.")
@@ -221,116 +237,136 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
                 X_copy[self._categorical_vars]
             )
 
-        categorical_inputs = []
-        categorical_embedded = []
-        for i, catvar in enumerate(self._categorical_vars):
-            # Add one more dimension for unseen values (oov)
-            unique = X_copy[catvar].nunique() + 1
-            if self.dimensions:
-                dimension = self.dimensions[i]
-            else:
-                dimension = min(50, int(np.ceil(unique / 2)))
-            categorical_input = layers.Input(
-                shape=(), name=f"categorical_input_{catvar}"
-            )
-            categorical_inputs.append(categorical_input)
-            embedding = layers.Embedding(unique, dimension, name=f"embedding_{catvar}")(
-                categorical_input
-            )
-            categorical_embedded.append(embedding)
+        if self.pretrained:
+            self._embeddings_mapping = self.mapping_from_json()
 
-        if len(self._categorical_vars) > 1:
-            all_categorical = layers.Concatenate()(categorical_embedded)
         else:
-            all_categorical = categorical_embedded[0]
-        if self._numeric_vars:
-            numeric_input = layers.Input(
-                shape=(len(self._numeric_vars)), name="numeric_input"
-            )
-            x = layers.Concatenate()([numeric_input, all_categorical])
-        else:
-            x = all_categorical
-            numeric_input = []
+            try:
+                import tensorflow as tf
+                from tensorflow.keras import layers, Model, callbacks
+            except ImportError as error:
+                raise Exception(
+                    "Tensorflow not installed, Use 'pip install embedding-encoder[tf]'"
+                ) from error
 
-        for units in self._layers_units:
-            x = layers.Dense(units, activation="relu")(x)
-            x = layers.Dropout(self.dropout)(x)
-
-        if self.task == "regression":
-            output = layers.Dense(1)(x)
-            loss = "mse"
-            metrics = [loss]
-        else:
-            metrics = ["accuracy"]
-            if self.classif_classes:
-                output_units = self.classif_classes
-                loss = self.classif_loss
-            else:
-                nunique_y = len(np.unique(y))
-                if y.ndim == 1 and nunique_y == 2:
-                    output_units = 1
-                elif y.ndim == 1 and nunique_y > 2:
-                    output_units = nunique_y
+            self._layers_units = self.layers_units or [24, 12]
+            categorical_inputs = []
+            categorical_embedded = []
+            for i, catvar in enumerate(self._categorical_vars):
+                # Add one more dimension for unseen values (oov)
+                unique = X_copy[catvar].nunique() + 1
+                if self.dimensions:
+                    dimension = self.dimensions[i]
                 else:
-                    output_units = y.shape[1]
-            if output_units == 1:
-                output_activation = "sigmoid"
-                loss = "binary_crossentropy"
-            else:
-                output_activation = "softmax"
-                if y.ndim == 1:
-                    y = tf.one_hot(y, output_units)
-                loss = "categorical_crossentropy"
-            output = layers.Dense(output_units, activation=output_activation)(x)
-
-        if len(self._categorical_vars) > 1 or self._numeric_vars:
-            model = Model(inputs=[numeric_input] + categorical_inputs, outputs=output)
-        else:
-            model = Model(inputs=categorical_inputs[0], outputs=output)
-        model.compile(optimizer=self.optimizer, loss=loss, metrics=metrics)
-
-        numeric_x = (
-            [np.array(X_copy[self._numeric_vars]).astype(np.float32)]
-            if self._numeric_vars
-            else []
-        )
-        merged_x = numeric_x + [
-            X_copy[i].astype(np.float32) for i in self._categorical_vars
-        ]
-        if self.validation_split > 0.0:
-            monitor = "val_loss"
-        else:
-            monitor = "loss"
-        history = model.fit(
-            x=merged_x,
-            y=y,
-            epochs=self.epochs,
-            batch_size=self.batch_size,
-            verbose=self.verbose,
-            validation_split=self.validation_split,
-            callbacks=[
-                callbacks.EarlyStopping(
-                    monitor=monitor, patience=2, restore_best_weights=True
+                    dimension = min(50, int(np.ceil(unique / 2)))
+                categorical_input = layers.Input(
+                    shape=(), name=f"categorical_input_{catvar}"
                 )
-            ],
-        )
-        self._history = history.history
-        if self.keep_model:
-            self._model = model
+                categorical_inputs.append(categorical_input)
+                embedding = layers.Embedding(
+                    unique, dimension, name=f"embedding_{catvar}"
+                )(categorical_input)
+                categorical_embedded.append(embedding)
 
-        self._weights = {
-            k: model.get_layer(f"embedding_{k}").weights for k in self._categorical_vars
-        }
-        self._embeddings_mapping = {
-            k: pd.DataFrame(
-                self._weights[k][0].numpy(),
-                index=np.sort(np.append(X_copy[k].unique(), self.unknown_category)),
-                columns=[
-                    f"embedding_{k}_{i}" for i in range(self._weights[k][0].shape[1])
+            if len(self._categorical_vars) > 1:
+                all_categorical = layers.Concatenate()(categorical_embedded)
+            else:
+                all_categorical = categorical_embedded[0]
+            if self._numeric_vars:
+                numeric_input = layers.Input(
+                    shape=(len(self._numeric_vars)), name="numeric_input"
+                )
+                x = layers.Concatenate()([numeric_input, all_categorical])
+            else:
+                x = all_categorical
+                numeric_input = []
+
+            for units in self._layers_units:
+                x = layers.Dense(units, activation="relu")(x)
+                x = layers.Dropout(self.dropout)(x)
+
+            if self.task == "regression":
+                output = layers.Dense(1)(x)
+                loss = "mse"
+                metrics = [loss]
+            else:
+                metrics = ["accuracy"]
+                if self.classif_classes:
+                    output_units = self.classif_classes
+                    loss = self.classif_loss
+                else:
+                    nunique_y = len(np.unique(y))
+                    if y.ndim == 1 and nunique_y == 2:
+                        output_units = 1
+                    elif y.ndim == 1 and nunique_y > 2:
+                        output_units = nunique_y
+                    else:
+                        output_units = y.shape[1]
+                if output_units == 1:
+                    output_activation = "sigmoid"
+                    loss = "binary_crossentropy"
+                else:
+                    output_activation = "softmax"
+                    if y.ndim == 1:
+                        y = tf.one_hot(y, output_units)
+                    loss = "categorical_crossentropy"
+                output = layers.Dense(output_units, activation=output_activation)(x)
+
+            if len(self._categorical_vars) > 1 or self._numeric_vars:
+                model = Model(
+                    inputs=[numeric_input] + categorical_inputs, outputs=output
+                )
+            else:
+                model = Model(inputs=categorical_inputs[0], outputs=output)
+            model.compile(optimizer=self.optimizer, loss=loss, metrics=metrics)
+
+            numeric_x = (
+                [np.array(X_copy[self._numeric_vars]).astype(np.float32)]
+                if self._numeric_vars
+                else []
+            )
+            merged_x = numeric_x + [
+                X_copy[i].astype(np.float32) for i in self._categorical_vars
+            ]
+            if self.validation_split > 0.0:
+                monitor = "val_loss"
+            else:
+                monitor = "loss"
+            history = model.fit(
+                x=merged_x,
+                y=y,
+                epochs=self.epochs,
+                batch_size=self.batch_size,
+                verbose=self.verbose,
+                validation_split=self.validation_split,
+                callbacks=[
+                    callbacks.EarlyStopping(
+                        monitor=monitor, patience=2, restore_best_weights=True
+                    )
                 ],
             )
-            for k in self._categorical_vars
-        }
+            self._history = history.history
+            if self.keep_model:
+                self._model = model
+
+            self._weights = {
+                k: model.get_layer(f"embedding_{k}").weights
+                for k in self._categorical_vars
+            }
+            self._embeddings_mapping = {
+                k: pd.DataFrame(
+                    self._weights[k][0].numpy(),
+                    index=np.sort(np.append(X_copy[k].unique(), self.unknown_category)),
+                    columns=[
+                        f"embedding_{k}_{i}"
+                        for i in range(self._weights[k][0].shape[1])
+                    ],
+                )
+                for k in self._categorical_vars
+            }
+            if self.mapping_path:
+                self.mapping_to_json()
+
         columns_out = []
         for k in self._embeddings_mapping.values():
             columns_out.extend(k.columns)
@@ -338,7 +374,23 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
 
         return self
 
-    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+    def mapping_to_json(self) -> None:
+        path = Path(self.mapping_path)
+        json_mapping = {k: v.to_dict() for k, v in self._embeddings_mapping.items()}
+        with open(path, "w") as f:
+            json.dump(json_mapping, f)
+        return
+
+    def mapping_from_json(self) -> Dict[str, pd.DataFrame]:
+        path = Path(self.mapping_path)
+        with open(path, "r") as f:
+            json_mapping = json.load(f)
+        json_mapping = {k: pd.DataFrame.from_dict(v) for k, v in json_mapping.items()}
+        for df in json_mapping.values():
+            df.index = pd.to_numeric(df.index)
+        return json_mapping
+
+    def transform(self, X: pd.DataFrame) -> Union[pd.DataFrame, np.ndarray]:
         """
         Transform X using computed variable embeddings.
 
@@ -379,11 +431,11 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
         )
 
         if isinstance(X, np.ndarray):
-            final_embeddings = np.array(final_embeddings, dtype=X.dtype)
+            final_embeddings = np.array(final_embeddings)
 
         return final_embeddings
 
-    def inverse_transform(self, X: pd.DataFrame) -> pd.DataFrame:
+    def inverse_transform(self, X: Union[pd.DataFrame, np.ndarray]) -> pd.DataFrame:
         """
         Inverse transform X using computed variable embeddings.
 
@@ -399,6 +451,8 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
         if not isinstance(X, (pd.DataFrame, np.ndarray)):
             X = np.array(X)
         X_copy = X.copy()
+        if not isinstance(X_copy, pd.DataFrame):
+            X_copy = pd.DataFrame(X_copy, columns=[f"cat{i}" for i in range(X_copy.shape[1])])
 
         inverted_dfs = []
         for k in self._categorical_vars:
@@ -419,6 +473,8 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
         else:
             original = output
         original = original.astype(dict(zip(original.columns, self._fit_dtypes)))
+        if isinstance(X, np.ndarray):
+            original = original.values
         return original
 
     def get_feature_names_out(self, input_features=None):
