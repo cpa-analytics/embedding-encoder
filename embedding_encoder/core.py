@@ -1,7 +1,7 @@
 from __future__ import annotations
 from ast import Import
 import json
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Dict
 from pathlib import Path
 
 import pandas as pd
@@ -375,14 +375,14 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
 
         return self
 
-    def mapping_to_json(self):
+    def mapping_to_json(self) -> None:
         path = Path(self.mapping_path)
         json_mapping = {k: v.to_dict() for k, v in self._embeddings_mapping.items()}
         with open(path, "w") as f:
             json.dump(json_mapping, f)
         return
 
-    def mapping_from_json(self):
+    def mapping_from_json(self) -> Dict[str, pd.DataFrame]:
         path = Path(self.mapping_path)
         with open(path, "r") as f:
             json_mapping = json.load(f)
@@ -391,7 +391,7 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
             df.index = pd.to_numeric(df.index)
         return json_mapping
 
-    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+    def transform(self, X: pd.DataFrame) -> Union[pd.DataFrame, np.ndarray]:
         """
         Transform X using computed variable embeddings.
 
@@ -436,7 +436,7 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
 
         return final_embeddings
 
-    def inverse_transform(self, X: pd.DataFrame) -> pd.DataFrame:
+    def inverse_transform(self, X: Union[pd.DataFrame, np.ndarray]) -> pd.DataFrame:
         """
         Inverse transform X using computed variable embeddings.
 
@@ -452,6 +452,8 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
         if not isinstance(X, (pd.DataFrame, np.ndarray)):
             X = np.array(X)
         X_copy = X.copy()
+        if not isinstance(X_copy, pd.DataFrame):
+            X_copy = pd.DataFrame(X_copy, columns=[f"cat{i}" for i in range(X_copy.shape[1])])
 
         inverted_dfs = []
         for k in self._categorical_vars:
@@ -472,6 +474,8 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
         else:
             original = output
         original = original.astype(dict(zip(original.columns, self._fit_dtypes)))
+        if isinstance(X, np.ndarray):
+            original = original.values
         return original
 
     def get_feature_names_out(self, input_features=None):
