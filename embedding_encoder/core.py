@@ -6,7 +6,8 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 from sklearn.base import BaseEstimator, TransformerMixin
-from sklearn.preprocessing import OrdinalEncoder
+
+from embedding_encoder.custom_ordinal import OrdinalEncoderStart1
 
 
 class EmbeddingEncoder(BaseEstimator, TransformerMixin):
@@ -15,9 +16,6 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
     Embedding Encoder trains a small neural network with categorical inputs passed through
     embedding layers. Numeric variables can be included as additional inputs by setting
     :attr:`numeric_vars`.
-
-    By default, non numeric variables are encoded with scikit-learn's `OrdinalEncoder`. This
-    can be changed by setting `encode=False` if no encoding is necessary.
 
     Embedding Encoder returns (unique_values + 1) / 2 vectors per categorical variable, with a minimum of 2
     and a maximum of 50. However, this can be changed by passing a list of integers to :attr:`dimensions`.
@@ -47,11 +45,6 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
     task :
         "regression" or "classification". This determines the units in the head layer, loss and
         metrics used.
-    encode :
-        Whether to apply `OrdinalEncoder` to categorical variables, by default True.
-    unknown_category :
-        Out of vocabulary values will be mapped to this category. This should match the unknown
-        value used in OrdinalEncoder.
     numeric_vars :
         Array-like of strings containing the names of the numeric variables that will be included
         as inputs to the network.
@@ -86,7 +79,7 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
     keep_model :
         Whether to assign the Tensorflow model to :attr:`_model`. Setting to True will prevent the
         EmbeddingEncoder from being pickled. Default False. Please note that the model's `history`
-        dict is available at :attr:`history`.
+        dict is available at :attr:`_history`.
 
     Attributes
     ----------
@@ -112,8 +105,6 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
     def __init__(
         self,
         task: str,
-        encode: bool = True,
-        unknown_category: int = 999,
         numeric_vars: Optional[List[str]] = None,
         dimensions: Optional[List[int]] = None,
         layers_units: Optional[List[int]] = None,
@@ -137,8 +128,6 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
             raise ValueError(
                 "classif_classes and classif_loss must be None for regression"
             )
-        self.encode = encode
-        self.unknown_category = unknown_category
         self.numeric_vars = numeric_vars
         self.dimensions = dimensions
         self.layers_units = layers_units
@@ -229,13 +218,10 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
             self._categorical_vars = list(X_copy.columns)
         self._fit_dtypes = X_copy.dtypes
 
-        if self.encode:
-            self._ordinal_encoder = OrdinalEncoder(
-                handle_unknown="use_encoded_value", unknown_value=self.unknown_category
-            )
-            X_copy[self._categorical_vars] = self._ordinal_encoder.fit_transform(
-                X_copy[self._categorical_vars]
-            )
+        self._ordinal_encoder = OrdinalEncoderStart1()
+        X_copy[self._categorical_vars] = self._ordinal_encoder.fit_transform(
+            X_copy[self._categorical_vars]
+        )
 
         if self.pretrained:
             self._embeddings_mapping = self.mapping_from_json()
@@ -356,7 +342,7 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
             self._embeddings_mapping = {
                 k: pd.DataFrame(
                     self._weights[k][0].numpy(),
-                    index=np.sort(np.append(X_copy[k].unique(), self.unknown_category)),
+                    index=np.sort(np.append(X_copy[k].unique(), 0)),
                     columns=[
                         f"embedding_{k}_{i}"
                         for i in range(self._weights[k][0].shape[1])
@@ -418,10 +404,9 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
         if not all(i in X_copy.columns for i in self._categorical_vars):
             raise ValueError("X must contain all categorical variables.")
 
-        if self.encode:
-            X_copy[self._categorical_vars] = self._ordinal_encoder.transform(
-                X_copy[self._categorical_vars]
-            )
+        X_copy[self._categorical_vars] = self._ordinal_encoder.transform(
+            X_copy[self._categorical_vars]
+        )
         final_embeddings = []
         for k in self._categorical_vars:
             final_embedding = X_copy.join(self._embeddings_mapping[k], on=k, how="left")
@@ -452,7 +437,9 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
             X = np.array(X)
         X_copy = X.copy()
         if not isinstance(X_copy, pd.DataFrame):
-            X_copy = pd.DataFrame(X_copy, columns=[f"cat{i}" for i in range(X_copy.shape[1])])
+            X_copy = pd.DataFrame(
+                X_copy, columns=[f"cat{i}" for i in range(X_copy.shape[1])]
+            )
 
         inverted_dfs = []
         for k in self._categorical_vars:
@@ -465,13 +452,9 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
             inverted_dfs.append(inverted)
         output = pd.concat(inverted_dfs, axis=1)
 
-        if self.encode:
-            original = self._ordinal_encoder.inverse_transform(output)
-            original = pd.DataFrame(
-                original, columns=output.columns, index=X_copy.index
-            )
-        else:
-            original = output
+        original = self._ordinal_encoder.inverse_transform(output)
+        original = pd.DataFrame(original, columns=output.columns, index=X_copy.index)
+
         original = original.astype(dict(zip(original.columns, self._fit_dtypes)))
         if isinstance(X, np.ndarray):
             original = original.values
