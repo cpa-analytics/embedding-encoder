@@ -4,7 +4,6 @@ import pytest
 import pandas as pd
 import numpy as np
 import tensorflow as tf
-from sklearn.preprocessing import OrdinalEncoder
 
 from embedding_encoder import EmbeddingEncoder
 
@@ -54,18 +53,13 @@ def test_array_X():
     assert X_transformed.shape == (X.shape[0], 4)
 
 
-@pytest.mark.parametrize("encode,dimensions", [(True, None), (False, [3, 2])])
-def test_basic_parameters(encode, dimensions):
+@pytest.mark.parametrize("dimensions,", [(None), ([3, 2])])
+def test_basic_parameters(dimensions):
     X = pd.DataFrame(
         {"A": ["a", "b", "c", "d", "e", "f"], "B": ["z", "y", "x", "w", "v", "u"]}
     )
     y = np.array([1, 0, 1, 0, 1, 0])
-    ee = EmbeddingEncoder(
-        task="classification", encode=encode, epochs=1, dimensions=dimensions
-    )
-    if encode is False:
-        encoder = OrdinalEncoder()
-        X[["A", "B"]] = encoder.fit_transform(X[["A", "B"]])
+    ee = EmbeddingEncoder(task="classification", epochs=1, dimensions=dimensions)
     ee.fit(X, y)
     X_transformed = ee.transform(X)
     # 7 unique values, + 1 for oov, divided by 2 and rounded up = 4 * 2 variables = 8

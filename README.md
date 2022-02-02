@@ -26,7 +26,7 @@ Full documentation including this readme and API reference can be found at [RTD]
 
 ## Usage
 
-Embedding Encoder works like any scikit-learn transformer, the only difference being that it requires `y` to be passed as it is the neural network's target. By default it will convert categorical variables into integer arrays by applying scikit-learn's `OrdinalEncoder`.
+Embedding Encoder works like any scikit-learn transformer, the only difference being that it requires `y` to be passed as it is the neural network's target.
 
 Embedding Encoder will assume that all input columns are categorical and will calculate embeddings for each, unless the `numeric_vars` argument is passed. In that case, numeric variables will be included as an additional input to the neural network but no embeddings will be calculated for them, and they will not be included in the output transformation.
 
