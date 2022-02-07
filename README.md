@@ -88,7 +88,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.impute import SimpleImputer
 
 from embedding_encoder import EmbeddingEncoder
-from embedding_encoder.compose import ColumnTransformerWithNames
+from embedding_encoder.utils import ColumnTransformerWithNames
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
 

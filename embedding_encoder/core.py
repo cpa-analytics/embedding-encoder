@@ -7,7 +7,7 @@ import pandas as pd
 import numpy as np
 from sklearn.base import BaseEstimator, TransformerMixin
 
-from embedding_encoder.custom_ordinal import OrdinalEncoderStart1
+from embedding_encoder.utils import OrdinalEncoderStart1
 
 
 class EmbeddingEncoder(BaseEstimator, TransformerMixin):
