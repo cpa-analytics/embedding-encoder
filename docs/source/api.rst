@@ -15,7 +15,7 @@ EmbeddingEncoder class
 
 Utilities
 ---------------
-.. automodule:: embedding_encoder.compose
+.. automodule:: embedding_encoder.utils.compose
    :members:
    :undoc-members:
    :show-inheritance:
