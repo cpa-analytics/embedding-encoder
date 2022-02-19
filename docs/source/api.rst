@@ -19,7 +19,3 @@ Utilities
    :members:
    :undoc-members:
    :show-inheritance:
-.. automodule:: embedding_encoder.utils.plot
-   :members:
-   :undoc-members:
-   :show-inheritance:
