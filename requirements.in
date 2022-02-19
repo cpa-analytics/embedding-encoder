@@ -1,4 +1,4 @@
 scikit-learn
 pandas
-tensorflow
+tensorflow>=2.8.0
 seaborn
