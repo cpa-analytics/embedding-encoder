@@ -119,7 +119,7 @@ from embedding_encoder import EmbeddingEncoder
 
 ee = EmbeddingEncoder(task="classification")
 ee.fit(X=X, y=y)
-plot_embeddings(ee, variable="", )
+ee.plot_embeddings(variable="", model="pca")
 ```
 
 ## Advanced usage
