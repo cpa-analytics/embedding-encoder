@@ -2,7 +2,9 @@
 
 ## Overview
 
-Embedding Encoder is a scikit-learn-compliant transformer that converts categorical variables to numeric vector representations. This is achieved by creating a small multilayer perceptron architecture in which each categorical variable is passed through an embedding layer, for which weights are extracted and turned into DataFrame columns.
+Embedding Encoder is a scikit-learn-compliant transformer that converts categorical variables into numeric vector representations. This is achieved by creating a small multilayer perceptron architecture in which each categorical variable is passed through an embedding layer, for which weights are extracted and turned into DataFrame columns.
+
+While the idea is not new (it was popularized after [the team that landed in the 3rd place of the Rossmann Kaggle competition used it](https://www.kaggle.com/c/rossmann-store-sales/discussion/17974)), and although Python implementations have surfaced over the years, we are not aware of any library that integrates this functionality into scikit-learn.
 
 ## Installation and dependencies
 
@@ -105,6 +107,20 @@ pipe.fit(X_train, y_train)
 ```
 
 Like scikit transformers, Embedding Encoder also has a `inverse_transform` method that recomposes the original input.
+
+## Plotting embeddings
+
+The idea behind embeddings is that categories that are conceptually similar should have similar vector representations. For example, "December" and "January" should be close to each other when the target variable is ice cream sales.
+
+This can be analyzed with the `plot_embeddings` function.
+
+```python
+from embedding_encoder import EmbeddingEncoder
+
+ee = EmbeddingEncoder(task="classification")
+ee.fit(X=X, y=y)
+plot_embeddings(ee, variable="", )
+```
 
 ## Advanced usage
 
