@@ -467,7 +467,7 @@ class EmbeddingEncoder(BaseEstimator, TransformerMixin):
         return self._columns_out
 
     def plot_embeddings(self, variable: str, model: str = "pca"):
-        """Plot embeddings for a variable by passing a fitted EmbeddingEncoder and reducing to 2D.
+        """Create a 2D scatterplot of a variable's embeddings. Each dot represents a category.
 
         Parameters
         ----------

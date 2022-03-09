@@ -1,4 +1,4 @@
-# Embedding Encoder
+![](https://raw.githubusercontent.com/cpa-analytics/embedding-encoder/main/logo.png)
 
 ## Overview
 
@@ -110,16 +110,16 @@ Like scikit transformers, Embedding Encoder also has a `inverse_transform` metho
 
 ## Plotting embeddings
 
-The idea behind embeddings is that categories that are conceptually similar should have similar vector representations. For example, "December" and "January" should be close to each other when the target variable is ice cream sales.
+The idea behind embeddings is that categories that are conceptually similar should have similar vector representations. For example, "December" and "January" should be close to each other when the target variable is ice cream sales (here in the Southern Hemisphere at least!).
 
-This can be analyzed with the `plot_embeddings` function.
+This can be analyzed with the `plot_embeddings` function, which depends on Seaborn (`pip install embedding-encoder[sns]` or `pip install embedding-encoder[full]` which includes Tensorflow).
 
 ```python
 from embedding_encoder import EmbeddingEncoder
 
 ee = EmbeddingEncoder(task="classification")
 ee.fit(X=X, y=y)
-ee.plot_embeddings(variable="", model="pca")
+ee.plot_embeddings(variable="...", model="pca")
 ```
 
 ## Advanced usage
