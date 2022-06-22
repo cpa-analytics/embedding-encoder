@@ -10,8 +10,6 @@ absl-py==1.0.0
     #   tensorflow
 astunparse==1.6.3
     # via tensorflow
-cached-property==1.5.2
-    # via h5py
 cachetools==5.0.0
     # via google-auth
 certifi==2021.10.8
@@ -42,8 +40,6 @@ h5py==3.6.0
     # via tensorflow
 idna==3.3
     # via requests
-importlib-metadata==4.11.1
-    # via markdown
 joblib==1.1.0
     # via scikit-learn
 keras==2.8.0
@@ -58,7 +54,7 @@ markdown==3.3.6
     # via tensorboard
 matplotlib==3.5.1
     # via seaborn
-numpy==1.21.5
+numpy==1.22.0
     # via
     #   h5py
     #   keras-preprocessing
@@ -145,9 +141,7 @@ tf-estimator-nightly==2.8.0.dev2021122109
 threadpoolctl==3.0.0
     # via scikit-learn
 typing-extensions==4.1.1
-    # via
-    #   importlib-metadata
-    #   tensorflow
+    # via tensorflow
 urllib3==1.26.8
     # via requests
 werkzeug==2.0.3
@@ -158,8 +152,6 @@ wheel==0.37.1
     #   tensorboard
 wrapt==1.13.3
     # via tensorflow
-zipp==3.7.0
-    # via importlib-metadata
 
 # The following packages are considered to be unsafe in a requirements file:
 # setuptools
